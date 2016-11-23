@@ -139,14 +139,26 @@ int main(int argc, char** argv) {
 		for (int j = 0; j != 2; ++j)
 			pml[i][j].fill(0);
 
-	//fstream recvsout;
-	//if (rgmpi::worldRank() == 0) {
-	//	recvsout.open("rcvs_out", ios_base::out | ios_base::trunc);
-	//	if (!recvsout.is_open()) throw logic_error("Can't open receivers file");
-	//}
+#ifdef USE_MPI
+	MPI_File fh;
+	if (0 != MPI_File_open(MPI_COMM_WORLD, cfg.rcvsOut.c_str(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh))
+		throw logic_error("Can't open receivers file for writing");
+	if (0 != MPI_File_set_size(fh, 0))
+		throw logic_error("Can't truncate receivers file");
+#else
+	fstream recvsout;
+	if (rgmpi::worldRank() == 0) {
+		recvsout.open(cfg.rcvsOut.c_str(), ios_base::out | ios_base::trunc);
+		if (!recvsout.is_open()) throw logic_error("Can't open receivers file for writing");
+	}
+#endif
 
 	double t = 0.0;
 	for (int step = 0; step != cfg.steps; ++step) {
+
+		DArrayContainer<double, int>& dac = u->getLocalContainer();
+		DArrayContainer<double, int>& dacNext = un->getLocalContainer();
+
 		if (step % cfg.saveStep == 0) {
 			// save to VTK
 			if (rgmpi::worldRank() == 0)
@@ -154,7 +166,6 @@ int main(int argc, char** argv) {
 			char name[100];
 			sprintf(name, "out-%06d.vtk", step);
 			DArray<float, int>& ds = dasSave.getDArrayPart(0, 0, 0);
-			DArrayContainer<double, int>& dac = das.getLocalContainer();
 			for (int k = 0; k != dac.numParts(Z); ++k)
 			for (int j = 0; j != dac.numParts(Y); ++j)
 			for (int i = 0; i != dac.numParts(X); ++i) {
@@ -169,13 +180,37 @@ int main(int argc, char** argv) {
 			vs.save(std::string(name));
 		}
 
-		DArrayContainer<double, int>& dac = u->getLocalContainer();
-		DArrayContainer<double, int>& dacNext = un->getLocalContainer();
-
 		u->externalSyncStart();
 		u->internalSync();
 		u->externalSyncEnd();
 
+		// save receivers
+#ifdef USE_MPI
+		for (vector<Receiver>::size_type i = 0; i != cfg.rcv.size(); ++i) {
+			const Dim3D<int> rind(cfg.rcv.at(i).x, cfg.rcv.at(i).y, cfg.rcv.at(i).z);
+			Dim3D<int> part = u->locatePart(rind);
+			if (part == u->getInternalPos()) {
+				const Dim3D<int>& dacInd = u->localInd(rind);
+				float val = dac.getNode(dacInd[X], dacInd[Y], dacInd[Z], 0);
+				if (0 != MPI_File_write_at(fh, (step * cfg.rcv.size() + i) * sizeof(float), &val, 1, MPI_FLOAT, MPI_STATUS_IGNORE))
+					throw logic_error("Can't write in receivers file");
+			}
+		}
+#else
+		//recvsout << cfg.dt * step << " ";
+		for (vector<Receiver>::size_type i = 0; i != cfg.rcv.size(); ++i) {
+			const Dim3D<int> rind(cfg.rcv.at(i).x, cfg.rcv.at(i).y, cfg.rcv.at(i).z);
+			Dim3D<int> part = u->locatePart(rind);
+			if (part == u->getInternalPos()) {
+				const Dim3D<int>& dacInd = u->localInd(rind);
+				float val = dac.getNode(dacInd[X], dacInd[Y], dacInd[Z], 0);
+				recvsout.write(reinterpret_cast<const char*>(&val), sizeof(float));
+			}
+		}
+		//recvsout << endl;
+#endif
+
+		// recalculate own DArrays
 		for (int gk = 0; gk != dac.numParts(Z); ++gk)
 			for (int gj = 0; gj != dac.numParts(Y); ++gj)
 				for (int gi = 0; gi != dac.numParts(X); ++gi) {
@@ -183,13 +218,6 @@ int main(int argc, char** argv) {
 					DArray<double, int>& x1 = x1das.getDArrayPart(gi, gj, gk);
 					DArray<double, int>& y1 = y1das.getDArrayPart(gi, gj, gk);
 					DArray<double, int>& z1 = z1das.getDArrayPart(gi, gj, gk);
-
-					// save receivers
-					//recvsout << t;
-					//for (vector<Receiver>::size_type i = 0; i != cfg.rcv.size(); ++i) {
-					//	recvsout << " " << u->val(cfg.rcv.at(i).x, cfg.rcv.at(i).y, cfg.rcv.at(i).z, 0);
-					//}
-					//recvsout << endl;
 
 					// inner area
 					for (int k = 0; k != p.localSize(Z); ++k) {
@@ -339,9 +367,13 @@ int main(int argc, char** argv) {
 		t += cfg.dt;
 	}
 
-	//if (rgmpi::worldRank() == 0) {
-	//	recvsout.close();
-	//}
+#ifdef USE_MPI
+	MPI_File_close(&fh);
+#else
+	if (rgmpi::worldRank() == 0) {
+		recvsout.close();
+	}
+#endif
 	}
 	rgmpi::forceFinalize();
 }

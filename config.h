@@ -28,9 +28,7 @@ public:
 	long pml_len;
 	double max_pml;
 
-	void printDebug();
-
-	Boundary bnd;
+	std::string rcvsOut;
 
 // Ready to work data
 	std::vector<Source> src;

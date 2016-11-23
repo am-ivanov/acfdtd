@@ -84,6 +84,8 @@ void Config::readConfig(string file) {
 	if (dims == 3) {
 		is >> rhoZFile;
 	}
+
+	is >> rcvsOut;;
 #ifndef USE_MPI
 	fs.close();
 #endif
