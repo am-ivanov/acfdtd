@@ -8,12 +8,33 @@ source mad-source.sh
 mkdir -p test
 cd test
 
+cat > rec.txt <<END
+322 202
+362 202
+402 202
+442 202
+482 202
+522 202
+END
+
+cat > rec-mad.txt <<END
+320 200
+360 200
+400 200
+440 200
+480 200
+520 200
+END
+
+rm -f rcvs_mad
+
 sfspike > Fvel.rsf mag=1500 nsp=1 k1=1 l1=200 d1=4 d2=4 \
 	label1=z label2=x n1=200 n2=200 o1=2 o2=2 unit1=m unit2=m
 sfspike > Fden.rsf mag=1 nsp=1 k1=1 l1=200 d1=4 d2=4 label1=z \
 	label2=x n1=200 n2=200 o1=2 o2=2 unit1=m unit2=m
-sfspike n1=2 nsp=2 k1=1,2 mag=402,402 o1=0 o2=0 > Fsou.rsf
-sfspike n1=2 nsp=2 k1=1,2 mag=402,202 o1=0 o2=0 > Frec.rsf
+sfspike n1=2 nsp=2 k1=1,2 mag=400,400 o1=0 o2=0 > Fsou.rsf
+echo in=rec-mad.txt n1=2 n2=6 data_format=ascii_float | sfdd form=native > Frec.rsf
+#sfspike n1=2 nsp=2 k1=1,2 mag=402,202 o1=0 o2=0 > Frec.rsf
 sfspike nsp=1 n1=2000 d1=0.0005 k1=400 | sfricker1 frequency=20 | sftransp > Fwav.rsf
 sfawefd2d < Fwav.rsf vel=Fvel.rsf sou=Fsou.rsf rec=Frec.rsf wfl=Fwfl.rsf \
 	den=Fden.rsf > Fdat.rsf verb=y free=n fdorder=2 expl=y snap=y dabc=n jdata=1 jsnap=10
@@ -22,26 +43,24 @@ echo 'label1=z unit1=m label2=x unit2=m' >> Fwfl.rsf
 cat > config.txt <<END
 2
 200 200
-4 4
+0.0 0.0
+4.0 4.0
 2000
 0.0005
 10
 400 10
 0 0 0 0
-2 3
-5 4
+2 2
+1 1
 srcs.txt
-rcvs.txt
+rec.txt
 K.txt
 rhox.txt rhoy.txt
+rcvs.txt
 END
 
 cat > srcs.txt <<END
-src_func.txt 100 100
-END
-
-cat > rcvs.txt <<END
-100 50
+src_func.txt 402.0 402.0
 END
 
 rm -f K.txt
@@ -63,7 +82,7 @@ END
 ../datagen datagenconf.txt
 
 sfdd form=ascii out=src_func.txt < Fwav.rsf > /dev/null
-sfdd form=ascii out=rcvs_mad < Fdat.rsf > /dev/null
+sfdisfil > rcvs_mad col=6 format="%e " number=n < Fdat.rsf
 
 tr -d '\n' < K.txt > __tmp
 tr ' ' '\n' < __tmp > K.txt
@@ -74,12 +93,14 @@ tr ' ' '\n' < __tmp > rho.txt
 tr -d '\n' < src_func.txt > __tmp
 tr ' ' '\n' < __tmp > src_func.txt
 
-tr -d '\n' < rcvs_mad > __tmp
-tr ' ' '\n' < __tmp > rcvs_mad
-
 rm __tmp
 
-time mpirun -np 6 ../acfdtd config.txt #> /dev/null
+rm -f rcvs.asc
+rm -f rcvs.txt
+
+time mpirun -np 4 ../acfdtd config.txt #> /dev/null
 echo OK
+
+../btoa <rcvs.txt >rcvs.asc 6
 
 ../plot
