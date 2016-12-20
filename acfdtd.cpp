@@ -10,7 +10,7 @@
 #include "rgrid/vtksaver.h"
 #include "rgrid/darrayscatter.h"
 
-//#include <fenv.h>
+#include <fenv.h>
 
 using namespace std;
 using namespace rgrid;
@@ -37,8 +37,10 @@ struct PMLParams {
 	real_t b;
 };
 
+
+
 int main(int argc, char** argv) {
-	//feenableexcept(FE_INVALID | FE_OVERFLOW);  // Enable all floating point exceptions but FE_INEXACT
+	feenableexcept(FE_INVALID | FE_OVERFLOW);  // Enable all floating point exceptions but FE_INEXACT
 	rgmpi::init(&argc, &argv);
 	{
 	if (argc != 2) {
@@ -48,19 +50,25 @@ int main(int argc, char** argv) {
 	Config cfg;
 	cfg.readConfig(argv[1]);
 
+	for (int i = -cfg.ho; i <= cfg.ho; ++i) {
+		if (i != 0)
+			cout << cfg.fdc.sc1(i) << " ";
+	}
+	cout << endl;
+
 	DArrayScatter<real_t, int_t> das;
 	das.setSizes(
 		Dim3D<int_t>(cfg.nx, cfg.ny, cfg.nz),
 		Dim3D<int_t>(cfg.gx, cfg.gy, cfg.gz),
 		Dim3D<int_t>(cfg.lx, cfg.ly, cfg.lz),
-		Dim3D<int_t>(1, 1, cfg.dims==3 ? 1 : 0),
+		Dim3D<int_t>(cfg.ho, cfg.ho, cfg.dims==3 ? cfg.ho : 0),
 		1);
 	DArrayScatter<real_t, int_t> dasNext;
 	dasNext.setSizes(
 		Dim3D<int_t>(cfg.nx, cfg.ny, cfg.nz),
 		Dim3D<int_t>(cfg.gx, cfg.gy, cfg.gz),
 		Dim3D<int_t>(cfg.lx, cfg.ly, cfg.lz),
-		Dim3D<int_t>(1, 1, cfg.dims==3 ? 1 : 0),
+		Dim3D<int_t>(cfg.ho, cfg.ho, cfg.dims==3 ? cfg.ho : 0),
 		1);
 	DArrayScatter<float, int_t> dasSave;
 	dasSave.setSizes(
@@ -82,25 +90,25 @@ int main(int argc, char** argv) {
 	x1das.setSizes(
 		cfg.rhox.getWidth(),
 		cfg.rhox.getLocalContainer().getWidth(),
-		Dim3D<int_t>(1, 0, 0),
+		Dim3D<int_t>(cfg.ho, 0, 0),
 		1);
 	y1das.setSizes(
 		cfg.rhoy.getWidth(),
 		cfg.rhoy.getLocalContainer().getWidth(),
-		Dim3D<int_t>(0, 1, 0),
+		Dim3D<int_t>(0, cfg.ho, 0),
 		1);
 	if (cfg.dims == 3) {
 		z1das.setSizes(
 			cfg.rhoz.getWidth(),
 			cfg.rhoz.getLocalContainer().getWidth(),
-			Dim3D<int_t>(0, 0, 1),
+			Dim3D<int_t>(0, 0, cfg.ho),
 			1);
 	} else {
 		z1das.setSizes(
 			Dim3D<int_t>(cfg.gx * cfg.lx, cfg.gy*cfg.ly, cfg.gz*cfg.lz),
 			Dim3D<int_t>(cfg.gx, cfg.gy, cfg.gz),
 			Dim3D<int_t>(cfg.lx, cfg.ly, cfg.lz),
-			Dim3D<int_t>(0,0,0),
+			Dim3D<int_t>(0, 0, 0),
 			1);
 	}
 
@@ -129,7 +137,7 @@ int main(int argc, char** argv) {
 	}
 	for (int_t i = 0; i != cfg.pml_len; ++i) {
 		PMLParams p;
-		p.pmlVal = cfg.max_pml * sqr(1 - (i + 1.0)/cfg.pml_len);
+		p.pmlVal = cfg.max_pml * sqr(1 - (i * 1.0)/cfg.pml_len);
 		p.b = exp(-p.pmlVal * cfg.dt);
 		p.a = p.b - 1;
 		pmlParams2.push_back(p);
@@ -226,63 +234,97 @@ int main(int argc, char** argv) {
 					DArray<real_t, int_t>& y1 = y1das.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& z1 = z1das.getDArrayPart(gi, gj, gk);
 
+					DArray<real_t, int_t>& rhox = cfg.rhox.getDArrayPart(gi, gj, gk);
+					DArray<real_t, int_t>& rhoy = cfg.rhoy.getDArrayPart(gi, gj, gk);
+					DArray<real_t, int_t>& rhoz = cfg.rhoz.getDArrayPart(gi, gj, gk);
+
 					// inner area
-					for (int_t k = 0; k != p.localSize(Z); ++k) {
-						for (int_t j = 0; j != p.localSize(Y); ++j) {
-							for (int_t i = 0; i != p.localSize(X)+1; ++i) {
-								int_t i2 = i + p.origin(X);
-								int_t j2 = j + p.origin(Y);
-								int_t k2 = k + p.origin(Z);
-								x1(i, j, k, 0) = (p(i, j, k, 0) - p(i-1, j, k, 0)) / cfg.dx;
+					for (int_t k = 0; k != rhox.localSize(Z); ++k) {
+						for (int_t j = 0; j != rhox.localSize(Y); ++j) {
+							for (int_t i = 0; i != rhox.localSize(X); ++i) {
+								int_t i2 = i + rhox.origin(X);
+								int_t j2 = j + rhox.origin(Y);
+								int_t k2 = k + rhox.origin(Z);
+								x1(i, j, k, 0) = 0;
+								for (int_t n = 0; n < cfg.ho; ++n)
+									x1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i+1+n, j, k, 0) - p(i-n, j, k, 0)) / cfg.dx;
 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
 									pml[0][0](i2,j2,k2,PHI1X) = pmlParams1.at(i2).b * pml[0][0](i2,j2,k2,PHI1X) + pmlParams1.at(i).a * x1(i,j,k,0);
 									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][0](i2,j2,k2,PHI1X);
-								} else if (i2 > cfg.nx - cfg.pml_len && cfg.isPml[0][1]) {
-									pml[0][1](cfg.nx-i2,j2,k2,PHI1X) = pmlParams1.at(cfg.nx-i2).b * pml[0][1](cfg.nx-i2,j2,k2,PHI1X) + pmlParams1.at(cfg.nx-i2).a * x1(i,j,k,0);
-									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][1](cfg.nx-i2,j2,k2,PHI1X);
+								} else if (i2 > cfg.nx-cfg.pml_len-2 && cfg.isPml[0][1]) {
+									pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) = pmlParams1.at(cfg.nx-i2-2).b * pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) + pmlParams1.at(cfg.nx-i2-2).a * x1(i,j,k,0);
+									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X);
 								}
 							}
 						}
 					}
 
-					for (int_t k = 0; k != p.localSize(Z); ++k) {
-						for (int_t j = 0; j != p.localSize(Y)+1; ++j) {
-							for (int_t i = 0; i != p.localSize(X); ++i) {
-								int_t i2 = i + p.origin(X);
-								int_t j2 = j + p.origin(Y);
-								int_t k2 = k + p.origin(Z);
-								y1(i,j,k,0) = (p(i,j,k,0) - p(i,j-1,k,0)) / cfg.dy;
+					for (int_t k = 0; k != rhoy.localSize(Z); ++k) {
+						for (int_t j = 0; j != rhoy.localSize(Y); ++j) {
+							for (int_t i = 0; i != rhoy.localSize(X); ++i) {
+								int_t i2 = i + rhoy.origin(X);
+								int_t j2 = j + rhoy.origin(Y);
+								int_t k2 = k + rhoy.origin(Z);
+								y1(i,j,k,0) = 0;
+								for (int_t n = 0; n < cfg.ho; ++n)
+									y1(i,j,k,0) += cfg.fdc.sc1(n+1) * (p(i,j+1+n,k,0) - p(i,j-n,k,0)) / cfg.dy;
 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
 									pml[1][0](i2,j2,k2,PHI1Y) = pmlParams1.at(j2).b * pml[1][0](i2,j2,k2,PHI1Y) + pmlParams1.at(j2).a * y1(i,j,k,0);
 									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][0](i2,j2,k2,PHI1Y);
-								} else if (j2 > cfg.ny - cfg.pml_len && cfg.isPml[1][1]) {
-									pml[1][1](i2,cfg.ny-j2,k2,PHI1Y) = pmlParams1.at(cfg.ny-j2).b * pml[1][1](i2,cfg.ny-j2,k2,PHI1Y) + pmlParams1.at(cfg.ny-j2).a * y1(i,j,k,0);
-									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][1](i2,cfg.ny-j2,k2,PHI1Y);
+								} else if (j2 > cfg.ny-cfg.pml_len-2 && cfg.isPml[1][1]) {
+									pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) = pmlParams1.at(cfg.ny-j2-2).b * pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) + pmlParams1.at(cfg.ny-j2-2).a * y1(i,j,k,0);
+									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y);
 								}
 							}
 						}
 					}
 
 					if (cfg.dims == 3)
-						for (int_t k = 0; k != p.localSize(Z)+1; ++k) {
-							for (int_t j = 0; j != p.localSize(Y); ++j) {
-								for (int_t i = 0; i != p.localSize(X); ++i) {
-									int_t i2 = i + p.origin(X);
-									int_t j2 = j + p.origin(Y);
-									int_t k2 = k + p.origin(Z);
-									z1(i,j,k,0) = (p(i,j,k,0) - p(i,j,k-1,0)) / cfg.dz;
+						for (int_t k = 0; k != rhoz.localSize(Z); ++k) {
+							for (int_t j = 0; j != rhoz.localSize(Y); ++j) {
+								for (int_t i = 0; i != rhoz.localSize(X); ++i) {
+									int_t i2 = i + rhoz.origin(X);
+									int_t j2 = j + rhoz.origin(Y);
+									int_t k2 = k + rhoz.origin(Z);
+									z1(i,j,k,0);
+									for (int_t n = 0; n < cfg.ho; ++n)
+										z1(i,j,k,0) += cfg.fdc.sc1(n+1) * (p(i,j,k+1+n,0) - p(i,j,k-n,0)) / cfg.dz;
 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
 										pml[2][0](i2,j2,k2,PHI1Z) = pmlParams1.at(k2).b * pml[2][0](i2,j2,k2,PHI1Z) + pmlParams1.at(k2).a * z1(i,j,k,0);
 										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][0](i2,j2,k2,PHI1Z);
-									} else if (k2 > cfg.nz - cfg.pml_len && cfg.isPml[2][1]) {
-										pml[2][1](i2,j2,cfg.nz-k2,PHI1Z) = pmlParams1.at(cfg.nz-k2).b * pml[2][1](i2,j2,cfg.nz-k2,PHI1Z) + pmlParams1.at(cfg.nz-k2).a * z1(i,j,k,0);
-										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][1](i2,j2,cfg.nz-k2,PHI1Z);
+									} else if (k2 > cfg.nz-cfg.pml_len-2 && cfg.isPml[2][1]) {
+										pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) = pmlParams1.at(cfg.nz-k2-2).b * pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) + pmlParams1.at(cfg.nz-k2-2).a * z1(i,j,k,0);
+										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z);
 									}
 								}
 							}
 						}
+				}
+
+		x1das.externalSyncStart();
+		y1das.externalSyncStart();
+		z1das.externalSyncStart();
+
+		x1das.internalSync();
+		y1das.internalSync();
+		z1das.internalSync();
+
+		x1das.externalSyncEnd();
+		y1das.externalSyncEnd();
+		z1das.externalSyncEnd();
+
+		for (int_t gk = 0; gk != dac.numParts(Z); ++gk)
+			for (int_t gj = 0; gj != dac.numParts(Y); ++gj)
+				for (int_t gi = 0; gi != dac.numParts(X); ++gi) {
+
+					DArray<real_t, int_t>& p = dac.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& pn = dacNext.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& K = cfg.K.getDArrayPart(gi, gj, gk);
+
+					DArray<real_t, int_t>& x1 = x1das.getDArrayPart(gi, gj, gk);
+					DArray<real_t, int_t>& y1 = y1das.getDArrayPart(gi, gj, gk);
+					DArray<real_t, int_t>& z1 = z1das.getDArrayPart(gi, gj, gk);
+
 					DArray<real_t, int_t>& rhox = cfg.rhox.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& rhoy = cfg.rhoy.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& rhoz = cfg.rhoz.getDArrayPart(gi, gj, gk);
@@ -295,7 +337,8 @@ int main(int argc, char** argv) {
 								int_t j2 = j + p.origin(Y);
 								int_t k2 = k + p.origin(Z);
 
-								x2 = (x1(i+1,j,k,0)/rhox(i+1,j,k,0) - x1(i,j,k,0)/rhox(i,j,k,0)) / cfg.dx;
+								for (int_t n = 0; n < cfg.ho; ++n)
+									x2 += cfg.fdc.sc1(n+1) * (x1(i+n,j,k,0)/rhox(i+n,j,k,0) - x1(i-1-n,j,k,0)/rhox(i-1-n,j,k,0)) / cfg.dx;
 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
 									pml[0][0](i2,j2,k2,PHI2X) = pmlParams2.at(i2).b * pml[0][0](i2,j2,k2,PHI2X) + pmlParams2.at(i2).a * x2;
 									x2 = x2 + pml[0][0](i2,j2,k2,PHI2X);
@@ -304,7 +347,8 @@ int main(int argc, char** argv) {
 									x2 = x2 + pml[0][1](cfg.nx-i2-1,j2,k2,PHI2X);
 								}
 
-								y2 = (y1(i,j+1,k,0)/rhoy(i,j+1,k,0) - y1(i,j,k,0)/rhoy(i,j,k,0)) / cfg.dy;
+								for (int_t n = 0; n < cfg.ho; ++n)
+									y2 += cfg.fdc.sc1(n+1) * (y1(i,j+n,k,0)/rhoy(i,j+n,k,0) - y1(i,j-1-n,k,0)/rhoy(i,j-1-n,k,0)) / cfg.dy;
 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
 									pml[1][0](i2,j2,k2,PHI2Y) = pmlParams2.at(j2).b * pml[1][0](i2,j2,k2,PHI2Y) + pmlParams2.at(j).a * y2;
 									y2 = y2 + pml[1][0](i2,j2,k2,PHI2Y);
@@ -314,7 +358,8 @@ int main(int argc, char** argv) {
 								}
 
 								if (cfg.dims == 3) {
-									z2 = (z1(i,j,k+1,0)/rhoz(i,j,k+1,0) - z1(i,j,k,0)/rhoz(i,j,k,0)) / cfg.dz;
+									for (int_t n = 0; n < cfg.ho; ++n)
+										z2 += cfg.fdc.sc1(n+1) * (z1(i,j,k+n,0)/rhoz(i,j,k+n,0) - z1(i,j,k-1-n,0)/rhoz(i,j,k-1-n,0)) / cfg.dz;
 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
 										pml[2][0](i2,j2,k2,PHI2Z) = pmlParams2.at(k2).b * pml[2][0](i2,j2,k2,PHI2Z) + pmlParams2.at(k2).a * z2;
 										z2 = z2 + pml[2][0](i2,j2,k2,PHI2Z);

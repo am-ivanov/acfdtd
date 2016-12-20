@@ -29,6 +29,12 @@ void Config::readConfig(string file) {
 #endif
 	is >> dims;
 
+	int_t order;
+	is >> order;
+	if (!(order > 0 && order % 2 == 0)) throw logic_error("Wrong order");
+	ho = order / 2;
+	fdc.calc(ho);
+
 	if (dims == 2) {
 		is >> nx >> ny;
 		is >> ox >> oy;
@@ -273,63 +279,70 @@ void Config::readK(string file) {
 		Dim3D<int_t>(nx, ny, nz),
 		Dim3D<int_t>(gx, gy, gz),
 		Dim3D<int_t>(lx, ly, lz),
-		Dim3D<int_t>(0, 0, 0),
+		Dim3D<int_t>(ho, ho, ho),
 		1);
 	K.loadData(file);
+	K.externalSyncStart();
+	K.internalSync();
+	K.fillGhost();
+	K.externalSyncEnd();
 }
 
 void Config::readRhoX(string file) {
 	// last block in global partitioning takes one additional node
 	Dim3D<vector<int_t> > globalWidth = K.getWidth();
-	globalWidth[X].at(globalWidth[X].size()-1) += 1;
+	globalWidth[X].at(globalWidth[X].size()-1) -= 1;
 	Dim3D<vector<int_t> > localWidth = K.getLocalContainer().getWidth();
 	// so if last block on current process we add node here
 	if (K.getInternalPos(X) == gx - 1) {
-		localWidth[X].at(localWidth[X].size()-1) += 1;
+		localWidth[X].at(localWidth[X].size()-1) -= 1;
 	}
 	rhox.setSizes(
 		globalWidth,
 		localWidth,
-		Dim3D<int_t>(1, 1, dims == 3 ? 1 : 0),
+		Dim3D<int_t>(ho, ho, dims == 3 ? ho : 0),
 		1);
 	rhox.loadData(file);
 	rhox.externalSyncStart();
 	rhox.internalSync();
+	rhox.fillGhost();
 	rhox.externalSyncEnd();
 }
 
 void Config::readRhoY(string file) {
 	Dim3D<vector<int_t> > globalWidth = K.getWidth();
-	globalWidth[Y].at(globalWidth[Y].size()-1) += 1;
+	globalWidth[Y].at(globalWidth[Y].size()-1) -= 1;
 	Dim3D<vector<int_t> > localWidth = K.getLocalContainer().getWidth();
 	if (K.getInternalPos(Y) == gy - 1) {
-		localWidth[Y].at(localWidth[Y].size()-1) += 1;
+		localWidth[Y].at(localWidth[Y].size()-1) -= 1;
 	}
 	rhoy.setSizes(
 		globalWidth,
 		localWidth,
-		Dim3D<int_t>(1, 1, dims == 3 ? 1 : 0),
+		Dim3D<int_t>(ho, ho, dims == 3 ? ho : 0),
 		1);
 	rhoy.loadData(file);
 	rhoy.externalSyncStart();
 	rhoy.internalSync();
+	rhoy.fillGhost();
 	rhoy.externalSyncEnd();
 }
 
 void Config::readRhoZ(string file) {
 	Dim3D<vector<int_t> > globalWidth = K.getWidth();
-	globalWidth[Z].at(globalWidth[Z].size()-1) += 1;
+	globalWidth[Z].at(globalWidth[Z].size()-1) -= 1;
 	Dim3D<vector<int_t> > localWidth = K.getLocalContainer().getWidth();
 	if (K.getInternalPos(Z) == gz - 1) {
-		localWidth[Z].at(localWidth[Z].size()-1) += 1;
+		localWidth[Z].at(localWidth[Z].size()-1) -= 1;
 	}
 	rhoz.setSizes(
 		globalWidth,
 		localWidth,
-		Dim3D<int_t>(1, 1, dims == 3 ? 1 : 0),
+		Dim3D<int_t>(ho, ho, dims == 3 ? ho : 0),
 		1);
 	rhoz.loadData(file);
 	rhoz.externalSyncStart();
 	rhoz.internalSync();
+	rhoz.fillGhost();
 	rhoz.externalSyncEnd();
 }

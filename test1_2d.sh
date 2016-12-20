@@ -42,6 +42,7 @@ echo 'label1=z unit1=m label2=x unit2=m' >> Fwfl.rsf
 
 cat > config.txt <<END
 2
+8
 200 200
 0.0 0.0
 4.0 4.0
@@ -49,7 +50,7 @@ cat > config.txt <<END
 0.0005
 10
 400 10
-0 0 0 0
+1 1 1 1
 2 2
 1 1
 srcs.txt
@@ -72,12 +73,12 @@ END
 rm -f rhox.txt rhoy.txt
 
 cat > datagenconf.txt <<END
-rhox.txt 1 201 200 1
+rhox.txt 1 199 200 1
 END
 ../datagen datagenconf.txt
 
 cat > datagenconf.txt <<END
-rhoy.txt 1 200 201 1
+rhoy.txt 1 200 199 1
 END
 ../datagen datagenconf.txt
 
