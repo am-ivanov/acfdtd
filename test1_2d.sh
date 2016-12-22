@@ -41,23 +41,25 @@ sfawefd2d < Fwav.rsf vel=Fvel.rsf sou=Fsou.rsf rec=Frec.rsf wfl=Fwfl.rsf \
 echo 'label1=z unit1=m label2=x unit2=m' >> Fwfl.rsf
 
 cat > config.txt <<END
-2
-8
-200 200
-0.0 0.0
-4.0 4.0
-2000
-0.0005
-10
-400 10
-1 1 1 1
-2 2
-1 1
-srcs.txt
-rec.txt
-K.txt
-rhox.txt rhoy.txt
-rcvs.txt
+dimensions = 2
+order = 2
+nodes = 200, 200
+origin = 0.0, 0.0
+space_step = 4.0, 4.0
+time_steps = 2000
+time_step = 0.0005
+save_every = 10
+pml_max = 400 # значение PML на границе (растет квадратично)
+pml_nodes = 10 # количество узлов, отведенных под PML
+left_boundaries = absorb, absorb # граничные условия на левых границах (absorb/free)
+right_boundaries = absorb, absorb # граничные условия на правых границах
+global_parts = 2, 3
+local_parts = 5, 4
+sources_position = srcs.txt
+receivers_position = rec.txt
+bulk_modulus = K.txt
+density = rhox.txt, rhoy.txt
+receivers_output = rcvs.txt
 END
 
 cat > srcs.txt <<END
@@ -99,7 +101,7 @@ rm __tmp
 rm -f rcvs.asc
 rm -f rcvs.txt
 
-time mpirun -np 4 ../acfdtd config.txt #> /dev/null
+time mpirun -np 6 ../acfdtd config.txt #> /dev/null
 echo OK
 
 ../btoa <rcvs.txt >rcvs.asc 6

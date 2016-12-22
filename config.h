@@ -3,7 +3,10 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
+#include "kutils/config.h"
+#include "fdcoeff.h"
 #include "common.h"
 #include "rgrid/darrayscatter.h"
 
@@ -43,6 +46,11 @@ public:
 
 	rgrid::DArrayScatter<real_t, int_t> K; // bulk modulus
 	rgrid::DArrayScatter<real_t, int_t> rhox, rhoy, rhoz; // density
+
+	int_t ho; // half order
+	FDCoeff fdc;
+
+	kutils::Config kconf;
 };
 
 #endif // CONFIG_H

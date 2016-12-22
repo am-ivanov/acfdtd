@@ -1,5 +1,6 @@
 #include "config.h"
 #include "rgrid/darrayscatter.h"
+#include "kutils/config.h"
 
 #include <fstream>
 
@@ -27,71 +28,92 @@ void Config::readConfig(string file) {
 	if (!fs.is_open()) throw logic_error("Couldn't open \"" + file + "\"");
 	istream& is = fs;
 #endif
-	is >> dims;
 
-	int_t order;
-	is >> order;
+	kconf.parseStream(is);
+
+	dims = kconf.get<int_t>("dimensions");
+	if (dims != 2 && dims != 3)
+		throw logic_error("Wrong dimensions");
+	int_t order = kconf.get<int_t>("order");
 	if (!(order > 0 && order % 2 == 0)) throw logic_error("Wrong order");
 	ho = order / 2;
 	fdc.calc(ho);
 
-	if (dims == 2) {
-		is >> nx >> ny;
-		is >> ox >> oy;
-		is >> dx >> dy;
-		oz = -1.0;
-		dz = 1.0;
-		nz = 1;
-	} else if (dims == 3) {
-		is >> nx >> ny >> nz;
-		is >> ox >> oy >> oz;
-		is >> dx >> dy >> dz;
-	} else throw logic_error("Wrong dimensions");
+	std::vector<int> a;
+	kconf.getEntry("nodes").getIntArray(a);
+	nx = a.at(0);
+	ny = a.at(1);
+	if (dims == 2) nz = 1;
+	else if (dims == 3) nz = a.at(2);
 
-	is >> steps >> dt;
+	std::vector<double> b;
+	b.clear();
+	kconf.getEntry("origin").getDoubleArray(b);
+	ox = b.at(0);
+	oy = b.at(1);
+	if (dims == 2) oz = -1;
+	else if (dims == 3) oz = b.at(2);
+
+	b.clear();
+	kconf.getEntry("space_step").getDoubleArray(b);
+	dx = b.at(0);
+	dy = b.at(1);
+	if (dims == 2) dz = 1;
+	else if (dims == 3) dz = b.at(2);
+
+	steps = kconf.get<int_t>("time_steps");
+	dt = kconf.get<real_t>("time_step");
 
 	ex = (nx + 1) * dx + ox;
 	ey = (ny + 1) * dy + oy;
 	ez = (nz + 1) * dz + oz;
 
-	is >> saveStep;
+	saveStep = kconf.get<int_t>("save_every");
 
-	is >> max_pml >> pml_len;
+	max_pml = kconf.get<real_t>("pml_max");
+	pml_len = kconf.get<real_t>("pml_nodes");
 
-	is >> isPml[0][0] >> isPml[0][1] >> isPml[1][0] >> isPml[1][1];
-	if (dims == 3) {
-		is >> isPml[2][0] >> isPml[2][1];
-	} else {
-		isPml[2][0] = false;
-		isPml[2][1] = false;
-	}
+	std::vector<std::string> s;
+	s.clear();
+	kconf.getEntry("left_boundaries").getStringArray(s);
+	isPml[0][0] = (s.at(0) == "absorb");
+	isPml[1][0] = (s.at(1) == "absorb");
+	if (dims == 3) isPml[2][0] = (s.at(2) == "absorb");
+	else isPml[2][0] = false;
 
-	is >> gx >> gy;
-	if (dims == 3) is >> gz;
-	else gz = 1;
-	is >> lx >> ly;
-	if (dims == 3) is >> lz;
-	else lz = 1;
+	s.clear();
+	kconf.getEntry("right_boundaries").getStringArray(s);
+	isPml[0][1] = (s.at(0) == "absorb");
+	isPml[1][1] = (s.at(1) == "absorb");
+	if (dims == 3) isPml[2][1] = (s.at(2) == "absorb");
+	else isPml[2][1] = false;
 
-	string sourcesFile;
-	is >> sourcesFile;
+	a.clear();
+	kconf.getEntry("global_parts").getIntArray(a);
+	gx = a.at(0);
+	gy = a.at(1);
+	if (dims == 2) gz = 1;
+	else if (dims == 3) gz = a.at(2);
 
-	string receiversFile;
-	is >> receiversFile;
+	a.clear();
+	kconf.getEntry("local_parts").getIntArray(a);
+	lx = a.at(0);
+	ly = a.at(1);
+	if (dims == 2) lz = 1;
+	else if (dims == 3) lz = a.at(2);
 
-	string KFile;
-	is >> KFile;
+	string sourcesFile = kconf.get<std::string>("sources_position");
+	string receiversFile = kconf.get<std::string>("receivers_position");
+	string KFile = kconf.get<std::string>("bulk_modulus");
 
-	string rhoXFile;
-	is >> rhoXFile;
-
-	string rhoYFile;
-	is >> rhoYFile;
-
+	s.clear();
+	kconf.getEntry("density").getStringArray(s);
+	string rhoXFile = s.at(0);
+	string rhoYFile = s.at(1);
 	string rhoZFile;
-	if (dims == 3) is >> rhoZFile;
+	if (dims == 3) rhoZFile = s.at(2);
 
-	is >> rcvsOut;
+	rcvsOut = kconf.get<std::string>("receivers_output");
 #ifndef USE_MPI
 	fs.close();
 #endif

@@ -1,14 +1,16 @@
+CXXFLAGS = -I . -I ~/code/rgrid -W -Wall -Wextra -Werror=narrowing
+
 simple: acfdtd.cpp config.cpp common.h config.h
-	g++ -fno-inline-small-functions acfdtd.cpp config.cpp -g3 ~/code/rgrid/build/libRGridStatic.a -I ~/code/rgrid -W -Wall -o acfdtd
+	g++ $(CXXFLAGS) -fno-inline-small-functions $(wildcard kutils/*.cpp) acfdtd.cpp config.cpp -g3 ~/code/rgrid/build/libRGridStatic.a -o acfdtd
 
 mpi: acfdtd.cpp config.cpp common.h config.h
-	mpicxx -fno-inline-small-functions -DUSE_MPI acfdtd.cpp config.cpp -g3 ~/code/rgrid/build_mpi/libRGridStatic.a -I ~/code/rgrid -W -Wall -o acfdtd -fmax-errors=1 -Wextra -Werror=narrowing
+	mpicxx $(CXXFLAGS) -fno-inline-small-functions -DUSE_MPI $(wildcard kutils/*.cpp) acfdtd.cpp config.cpp -g3 ~/code/rgrid/build_mpi/libRGridStatic.a -o acfdtd -fmax-errors=1
 
 simple_opt: acfdtd.cpp config.cpp common.h config.h
-	g++ -O2 acfdtd.cpp config.cpp -g ~/code/rgrid/build/libRGridStatic.a -I ~/code/rgrid -W -Wall -o acfdtd
+	g++ $(CXXFLAGS) -O2 $(wildcard kutils/*.cpp) acfdtd.cpp config.cpp -g ~/code/rgrid/build/libRGridStatic.a -o acfdtd
 
 mpi_opt: acfdtd.cpp config.cpp common.h config.h
-	mpicxx -O2 -DUSE_MPI acfdtd.cpp config.cpp -g ~/code/rgrid/build_mpi/libRGridStatic.a -I ~/code/rgrid -W -Wall -o acfdtd
+	mpicxx $(CXXFLAGS) -O2 -DUSE_MPI $(wildcard kutils/*.cpp) acfdtd.cpp config.cpp -g ~/code/rgrid/build_mpi/libRGridStatic.a -o acfdtd
 
 tools:
 	g++ -O2 -o datagen datagen.cpp

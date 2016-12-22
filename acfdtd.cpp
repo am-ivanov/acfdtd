@@ -50,11 +50,26 @@ int main(int argc, char** argv) {
 	Config cfg;
 	cfg.readConfig(argv[1]);
 
-	for (int i = -cfg.ho; i <= cfg.ho; ++i) {
-		if (i != 0)
-			cout << cfg.fdc.sc1(i) << " ";
-	}
-	cout << endl;
+	//for (int i = -cfg.ho; i <= cfg.ho; ++i) {
+	//	if (i != 0)
+	//		cout << cfg.fdc.sc1(i) << " ";
+	//}
+	//cout << endl;
+
+	cout << "dimensions = " << cfg.dims << endl;
+	cout << "order = " << cfg.ho * 2 << endl;
+	cout << "nodes = " << cfg.nx << ", " << cfg.ny << ", " << cfg.nz << endl;
+	cout << "origin = " << cfg.ox << ", " << cfg.oy << ", " << cfg.oz << endl;
+	cout << "space_step = " << cfg.dx << ", " << cfg.dy << ", " << cfg.dz << endl;
+	cout << "time_steps = " << cfg.steps << endl;
+	cout << "time_step = " << cfg.dt << endl;
+	cout << "save_every = " << cfg.saveStep << endl;
+	cout << "pml_max = " << cfg.max_pml << endl;
+	cout << "pml_nodes = " << cfg.pml_len << endl;
+	cout << "left_boundaries = " << cfg.isPml[0][0] << ", " << cfg.isPml[1][0] << ", " << cfg.isPml[2][0] << endl;
+	cout << "right_boundaries = " << cfg.isPml[0][1] << ", " << cfg.isPml[1][1] << ", " << cfg.isPml[2][1] << endl;
+	cout << "global_parts = " << cfg.gx << ", " << cfg.gy << ", " << cfg.gz << endl;
+	cout << "local_parts = " << cfg.gx << ", " << cfg.gy << ", " << cfg.gz << endl;
 
 	DArrayScatter<real_t, int_t> das;
 	das.setSizes(
