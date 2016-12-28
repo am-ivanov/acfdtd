@@ -15,11 +15,6 @@
 using namespace std;
 using namespace rgrid;
 
-inline real_t source(real_t w, real_t t0, real_t t) {
-	real_t tmp = sqr(M_PI * w * (t - t0));
-	return (1 - 2 * tmp) * exp(-tmp);
-}
-
 // first and second derivatives in pml layer
 enum {
 	PHI1X,
@@ -56,20 +51,44 @@ int main(int argc, char** argv) {
 	//}
 	//cout << endl;
 
-	cout << "dimensions = " << cfg.dims << endl;
-	cout << "order = " << cfg.ho * 2 << endl;
-	cout << "nodes = " << cfg.nx << ", " << cfg.ny << ", " << cfg.nz << endl;
-	cout << "origin = " << cfg.ox << ", " << cfg.oy << ", " << cfg.oz << endl;
-	cout << "space_step = " << cfg.dx << ", " << cfg.dy << ", " << cfg.dz << endl;
-	cout << "time_steps = " << cfg.steps << endl;
-	cout << "time_step = " << cfg.dt << endl;
-	cout << "save_every = " << cfg.saveStep << endl;
-	cout << "pml_max = " << cfg.max_pml << endl;
-	cout << "pml_nodes = " << cfg.pml_len << endl;
-	cout << "left_boundaries = " << cfg.isPml[0][0] << ", " << cfg.isPml[1][0] << ", " << cfg.isPml[2][0] << endl;
-	cout << "right_boundaries = " << cfg.isPml[0][1] << ", " << cfg.isPml[1][1] << ", " << cfg.isPml[2][1] << endl;
-	cout << "global_parts = " << cfg.gx << ", " << cfg.gy << ", " << cfg.gz << endl;
-	cout << "local_parts = " << cfg.gx << ", " << cfg.gy << ", " << cfg.gz << endl;
+	if (rgmpi::worldRank() == 0) {
+		cout << "dimensions = " << cfg.dims << endl;
+		cout << "order = " << cfg.ho * 2 << endl;
+		cout << "nodes = " << cfg.nx << ", " << cfg.ny << ", " << cfg.nz << endl;
+		cout << "origin = " << cfg.ox << ", " << cfg.oy << ", " << cfg.oz << endl;
+		cout << "space_step = " << cfg.dx << ", " << cfg.dy << ", " << cfg.dz << endl;
+		cout << "time_steps = " << cfg.steps << endl;
+		cout << "time_step = " << cfg.dt << endl;
+		cout << "save_every = " << cfg.saveStep << endl;
+		cout << "pml_max = " << cfg.max_pml << endl;
+		cout << "pml_nodes = " << cfg.pml_len << endl;
+		cout << "left_boundaries = " << cfg.isPml[0][0] << ", " << cfg.isPml[1][0] << ", " << cfg.isPml[2][0] << endl;
+		cout << "right_boundaries = " << cfg.isPml[0][1] << ", " << cfg.isPml[1][1] << ", " << cfg.isPml[2][1] << endl;
+		cout << "global_parts = " << cfg.gx << ", " << cfg.gy << ", " << cfg.gz << endl;
+		cout << "local_parts = " << cfg.lx << ", " << cfg.ly << ", " << cfg.lz << endl;
+
+		cout << "Sources: " << cfg.src.size() << endl;
+		for (vector<Source>::size_type i = 0; i < cfg.src.size(); ++i) {
+			cout << "source " << i << " position:" << endl;
+			cout
+				<< "index: "
+				<< cfg.src.at(i).i << " " << cfg.src.at(i).j << " " << cfg.src.at(i).k
+				<< ", coord: "
+				<< cfg.src.at(i).x << " " << cfg.src.at(i).y << " " << cfg.src.at(i).z
+				<< endl;
+		}
+
+		cout << "Receivers: " << cfg.src.size() << endl;
+		for (vector<Receiver>::size_type i = 0; i < cfg.src.size(); ++i) {
+			cout << "receiver " << i << " position:" << endl;
+			cout
+				<< "index: "
+				<< cfg.rcv.at(i).i << " " << cfg.rcv.at(i).j << " " << cfg.rcv.at(i).k
+				<< ", coord: "
+				<< cfg.rcv.at(i).x << " " << cfg.rcv.at(i).y << " " << cfg.rcv.at(i).z
+				<< endl;
+		}
+	}
 
 	DArrayScatter<real_t, int_t> das;
 	das.setSizes(
@@ -183,9 +202,10 @@ int main(int argc, char** argv) {
 		DArrayContainer<real_t, int_t>& dacNext = un->getLocalContainer();
 
 		if (step % cfg.saveStep == 0) {
-			// save to VTK
 			if (rgmpi::worldRank() == 0)
 				cout << "Step " << step << endl;
+
+			// save to VTK
 			char name[100];
 			sprintf(name, "out-%06ld.vtk", (long)step);
 			DArray<float, int_t>& ds = dasSave.getDArrayPart(0, 0, 0);
@@ -262,7 +282,8 @@ int main(int argc, char** argv) {
 								int_t k2 = k + rhox.origin(Z);
 								x1(i, j, k, 0) = 0;
 								for (int_t n = 0; n < cfg.ho; ++n)
-									x1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i+1+n, j, k, 0) - p(i-n, j, k, 0)) / cfg.dx;
+									x1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i+1+n, j, k, 0) - p(i-n, j, k, 0));
+								x1(i, j, k, 0) /= cfg.dx;
 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
 									pml[0][0](i2,j2,k2,PHI1X) = pmlParams1.at(i2).b * pml[0][0](i2,j2,k2,PHI1X) + pmlParams1.at(i).a * x1(i,j,k,0);
 									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][0](i2,j2,k2,PHI1X);
@@ -270,6 +291,7 @@ int main(int argc, char** argv) {
 									pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) = pmlParams1.at(cfg.nx-i2-2).b * pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) + pmlParams1.at(cfg.nx-i2-2).a * x1(i,j,k,0);
 									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X);
 								}
+								x1(i, j, k, 0) /= rhox(i, j, k, 0);
 							}
 						}
 					}
@@ -280,9 +302,10 @@ int main(int argc, char** argv) {
 								int_t i2 = i + rhoy.origin(X);
 								int_t j2 = j + rhoy.origin(Y);
 								int_t k2 = k + rhoy.origin(Z);
-								y1(i,j,k,0) = 0;
+								y1(i, j, k, 0) = 0;
 								for (int_t n = 0; n < cfg.ho; ++n)
-									y1(i,j,k,0) += cfg.fdc.sc1(n+1) * (p(i,j+1+n,k,0) - p(i,j-n,k,0)) / cfg.dy;
+									y1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i,j+1+n,k,0) - p(i,j-n,k,0));
+								y1(i, j, k, 0) /= cfg.dy;
 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
 									pml[1][0](i2,j2,k2,PHI1Y) = pmlParams1.at(j2).b * pml[1][0](i2,j2,k2,PHI1Y) + pmlParams1.at(j2).a * y1(i,j,k,0);
 									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][0](i2,j2,k2,PHI1Y);
@@ -290,6 +313,7 @@ int main(int argc, char** argv) {
 									pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) = pmlParams1.at(cfg.ny-j2-2).b * pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) + pmlParams1.at(cfg.ny-j2-2).a * y1(i,j,k,0);
 									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y);
 								}
+								y1(i, j, k, 0) /= rhoy(i, j, k, 0);
 							}
 						}
 					}
@@ -301,9 +325,10 @@ int main(int argc, char** argv) {
 									int_t i2 = i + rhoz.origin(X);
 									int_t j2 = j + rhoz.origin(Y);
 									int_t k2 = k + rhoz.origin(Z);
-									z1(i,j,k,0);
+									z1(i, j, k, 0) = 0;
 									for (int_t n = 0; n < cfg.ho; ++n)
-										z1(i,j,k,0) += cfg.fdc.sc1(n+1) * (p(i,j,k+1+n,0) - p(i,j,k-n,0)) / cfg.dz;
+										z1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i,j,k+1+n,0) - p(i,j,k-n,0));
+									z1(i, j, k, 0) /= cfg.dz;
 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
 										pml[2][0](i2,j2,k2,PHI1Z) = pmlParams1.at(k2).b * pml[2][0](i2,j2,k2,PHI1Z) + pmlParams1.at(k2).a * z1(i,j,k,0);
 										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][0](i2,j2,k2,PHI1Z);
@@ -311,6 +336,7 @@ int main(int argc, char** argv) {
 										pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) = pmlParams1.at(cfg.nz-k2-2).b * pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) + pmlParams1.at(cfg.nz-k2-2).a * z1(i,j,k,0);
 										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z);
 									}
+									z1(i, j, k, 0) /= rhoz(i, j, k, 0);
 								}
 							}
 						}
@@ -340,10 +366,6 @@ int main(int argc, char** argv) {
 					DArray<real_t, int_t>& y1 = y1das.getDArrayPart(gi, gj, gk);
 					DArray<real_t, int_t>& z1 = z1das.getDArrayPart(gi, gj, gk);
 
-					DArray<real_t, int_t>& rhox = cfg.rhox.getDArrayPart(gi, gj, gk);
-					DArray<real_t, int_t>& rhoy = cfg.rhoy.getDArrayPart(gi, gj, gk);
-					DArray<real_t, int_t>& rhoz = cfg.rhoz.getDArrayPart(gi, gj, gk);
-
 					for (int_t k = 0; k != p.localSize(Z); ++k) {
 						for (int_t j = 0; j != p.localSize(Y); ++j) {
 							for (int_t i = 0; i != p.localSize(X); ++i) {
@@ -353,7 +375,8 @@ int main(int argc, char** argv) {
 								int_t k2 = k + p.origin(Z);
 
 								for (int_t n = 0; n < cfg.ho; ++n)
-									x2 += cfg.fdc.sc1(n+1) * (x1(i+n,j,k,0)/rhox(i+n,j,k,0) - x1(i-1-n,j,k,0)/rhox(i-1-n,j,k,0)) / cfg.dx;
+									x2 += cfg.fdc.sc1(n+1) * (x1(i+n,j,k,0) - x1(i-1-n,j,k,0));
+								x2 /= cfg.dx;
 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
 									pml[0][0](i2,j2,k2,PHI2X) = pmlParams2.at(i2).b * pml[0][0](i2,j2,k2,PHI2X) + pmlParams2.at(i2).a * x2;
 									x2 = x2 + pml[0][0](i2,j2,k2,PHI2X);
@@ -363,7 +386,8 @@ int main(int argc, char** argv) {
 								}
 
 								for (int_t n = 0; n < cfg.ho; ++n)
-									y2 += cfg.fdc.sc1(n+1) * (y1(i,j+n,k,0)/rhoy(i,j+n,k,0) - y1(i,j-1-n,k,0)/rhoy(i,j-1-n,k,0)) / cfg.dy;
+									y2 += cfg.fdc.sc1(n+1) * (y1(i,j+n,k,0) - y1(i,j-1-n,k,0));
+								y2 /= cfg.dy;
 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
 									pml[1][0](i2,j2,k2,PHI2Y) = pmlParams2.at(j2).b * pml[1][0](i2,j2,k2,PHI2Y) + pmlParams2.at(j).a * y2;
 									y2 = y2 + pml[1][0](i2,j2,k2,PHI2Y);
@@ -374,7 +398,8 @@ int main(int argc, char** argv) {
 
 								if (cfg.dims == 3) {
 									for (int_t n = 0; n < cfg.ho; ++n)
-										z2 += cfg.fdc.sc1(n+1) * (z1(i,j,k+n,0)/rhoz(i,j,k+n,0) - z1(i,j,k-1-n,0)/rhoz(i,j,k-1-n,0)) / cfg.dz;
+										z2 += cfg.fdc.sc1(n+1) * (z1(i,j,k+n,0) - z1(i,j,k-1-n,0));
+									z2 /=  cfg.dz;
 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
 										pml[2][0](i2,j2,k2,PHI2Z) = pmlParams2.at(k2).b * pml[2][0](i2,j2,k2,PHI2Z) + pmlParams2.at(k2).a * z2;
 										z2 = z2 + pml[2][0](i2,j2,k2,PHI2Z);
@@ -395,47 +420,40 @@ int main(int argc, char** argv) {
 
 		// insert source
 		for (vector<Source>::iterator it = cfg.src.begin(); it != cfg.src.end(); ++it) {
+			real_t val = sqr(cfg.dt) * it->val.at(step) / (cfg.dx * cfg.dy * cfg.dz);
 			// put source only in real no ghost nodes
 			if (un->isPresent(Dim3D<int_t>(it->i  ,it->j  ,it->k  )))
 				un->getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k  ),0)
-					+= it->c[L][L][L] * sqr(cfg.dt) * it->val.at(step)
-					* cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k  ),0);
+					+= it->c[L][L][L] * val * cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k  ),0);
 
 			if (un->isPresent(Dim3D<int_t>(it->i+1,it->j  ,it->k  )))
 				un->getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k  ),0)
-					+= it->c[R][L][L] * sqr(cfg.dt) * it->val.at(step)
-					* cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k  ),0);
+					+= it->c[R][L][L] * val * cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k  ),0);
 
 			if (un->isPresent(Dim3D<int_t>(it->i  ,it->j+1,it->k  )))
 				un->getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k  ),0)
-					+= it->c[L][R][L] * sqr(cfg.dt) * it->val.at(step)
-					* cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k  ),0);
+					+= it->c[L][R][L] * val * cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k  ),0);
 
 			if (un->isPresent(Dim3D<int_t>(it->i+1,it->j+1,it->k  )))
 				un->getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k  ),0)
-					+= it->c[R][R][L] * sqr(cfg.dt) * it->val.at(step)
-					* cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k  ),0);
+					+= it->c[R][R][L] * val * cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k  ),0);
 
 			if (cfg.dims == 3) {
 				if (un->isPresent(Dim3D<int_t>(it->i  ,it->j  ,it->k+1)))
 					un->getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k+1),0)
-						+= it->c[L][L][R] * sqr(cfg.dt) * it->val.at(step)
-						* cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k+1),0);
+						+= it->c[L][L][R] * val * cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j  ,it->k+1),0);
 
 				if (un->isPresent(Dim3D<int_t>(it->i+1,it->j  ,it->k+1)))
 					un->getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k+1),0)
-						+= it->c[R][L][R] * sqr(cfg.dt) * it->val.at(step)
-						* cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k+1),0);
+						+= it->c[R][L][R] * val * cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j  ,it->k+1),0);
 
 				if (un->isPresent(Dim3D<int_t>(it->i  ,it->j+1,it->k+1)))
 					un->getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k+1),0)
-						+= it->c[L][R][R] * sqr(cfg.dt) * it->val.at(step)
-						* cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k+1),0);
+						+= it->c[L][R][R] * val * cfg.K.getNode(Dim3D<int_t>(it->i  ,it->j+1,it->k+1),0);
 
 				if (un->isPresent(Dim3D<int_t>(it->i+1,it->j+1,it->k+1)))
 					un->getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k+1),0)
-						+= it->c[R][R][R] * sqr(cfg.dt) * it->val.at(step)
-						* cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k+1),0);
+						+= it->c[R][R][R] * val * cfg.K.getNode(Dim3D<int_t>(it->i+1,it->j+1,it->k+1),0);
 			}
 		}
 

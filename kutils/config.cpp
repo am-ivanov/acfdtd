@@ -44,7 +44,7 @@ void ConfigEntry::setType(int type) throw(ConfigEntry::InvalidType)
 {
 	if (type != SECTION &&
 		type != VALUE ) {
-		throw InvalidType("Unknown entry type: " + STR(type));
+		throw InvalidType("Unknown entry type: " + kutils::toString(type));
 	}
 	this->type = type;
 }

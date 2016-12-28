@@ -9,8 +9,6 @@
 #include <sstream>
 #include <algorithm>
 
-#define STR(x) kutils::toString(x)
-
 namespace kutils {
 	std::string replace(const std::string& srcp, const std::string& what, const std::string& with);
 	std::string trim(const std::string& str);

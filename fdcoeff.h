@@ -75,14 +75,15 @@ public:
 			throw std::logic_error("Call calc() first");
 		return m_c2.at(labs(n));
 	}
-	real_t sc1(int_t n) {
-		if (m_c1.empty())
-			throw std::logic_error("Call calc() first");
-		if (n > 0) {
-			return m_sc1.at(n-1);
-		} else if (n < 0) {
-			return - m_sc1.at(-n-1);
-		} else throw std::logic_error("Can't get staggered zero coefficient");
+	real_t sc1(const int_t n) const {
+		#ifdef DEBUG
+			if (m_c1.empty())
+				throw std::logic_error("Call calc() first");
+			}
+			if (!(n >= 1)) {
+				throw std::logic_error("Can't get staggered zero coefficient");
+		#endif
+		return m_sc1[n-1];
 	}
 private:
 	std::vector<real_t> m_c1; // first derivatice coefficients

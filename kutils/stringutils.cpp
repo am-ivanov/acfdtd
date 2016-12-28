@@ -126,7 +126,7 @@ std::string kutils::fromBytes(const char* bytes, int len)
 	char* str = new char[len + 1];
 	memcpy(str, bytes, len);
 	str[len] = '\0';
-	return STR(str);
+	return kutils::toString(str);
 }
 
 
