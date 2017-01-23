@@ -51,6 +51,8 @@ public:
 	FDCoeff fdc;
 
 	kutils::Config kconf;
+
+	int format; // 0 - vtk, 1 - bin
 };
 
 #endif // CONFIG_H

@@ -69,6 +69,10 @@ void Config::readConfig(string file) {
 	ez = (nz + 1) * dz + oz;
 
 	saveStep = kconf.get<int_t>("save_every");
+	std::string saveFormat = kconf.get<std::string>("save_format");
+	if (saveFormat == "vtk") format = 0;
+	else if (saveFormat == "bin") format = 1;
+	else throw logic_error("Unknown format");
 
 	max_pml = kconf.get<real_t>("pml_max");
 	pml_len = kconf.get<real_t>("pml_nodes");

@@ -32,8 +32,6 @@ struct PMLParams {
 	real_t b;
 };
 
-
-
 int main(int argc, char** argv) {
 	feenableexcept(FE_INVALID | FE_OVERFLOW);  // Enable all floating point exceptions but FE_INEXACT
 	rgmpi::init(&argc, &argv);
@@ -205,9 +203,8 @@ int main(int argc, char** argv) {
 			if (rgmpi::worldRank() == 0)
 				cout << "Step " << step << endl;
 
-			// save to VTK
 			char name[100];
-			sprintf(name, "out-%06ld.vtk", (long)step);
+
 			DArray<float, int_t>& ds = dasSave.getDArrayPart(0, 0, 0);
 			for (int_t k = 0; k != dac.numParts(Z); ++k)
 			for (int_t j = 0; j != dac.numParts(Y); ++j)
@@ -220,7 +217,19 @@ int main(int argc, char** argv) {
 				}
 			}
 			ds.inverseBytes();
-			vs.save(std::string(name));
+
+			if (cfg.format == 0) {
+				// save to VTK
+				sprintf(name, "out-%06ld.vtk", (long)step);
+				vs.save(std::string(name));
+			}
+			else {
+				// save to binary
+				sprintf(name, "out-%06ld.bin", (long)step);
+				fstream trunc_fs(name, fstream::out | fstream::trunc);
+				trunc_fs.close();
+				dasSave.appendData(std::string(name));
+			}
 		}
 
 		u->externalSyncStart();
