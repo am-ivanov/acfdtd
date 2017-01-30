@@ -16,6 +16,52 @@ std::string Config::RIGHT_BRACKET = "]";
 std::string Config::SLASH = "/";
 std::string Config::EQUALS = "=";
 
+namespace kutils {
+
+template <>
+double ConfigEntry::get<double>(unsigned pos) {
+	std::vector<double> a;
+	getDoubleArray(a);
+	if (a.size() <= pos) {
+		throw NotFound("Entry with such index not found.");
+	}
+	return a.at(pos);
+}
+
+template <>
+int ConfigEntry::get<int>(unsigned pos) {
+	std::vector<int> a;
+	getIntArray(a);
+	if (a.size() <= pos) {
+		throw NotFound("Entry with such index not found.");
+	}
+	return a.at(pos);
+}
+
+template <>
+std::string ConfigEntry::get<std::string>(unsigned pos) {
+	std::vector<std::string> a;
+	getStringArray(a);
+	if ( a.size() <= pos) {
+		throw NotFound("Entry with such index not found.");
+	}
+	return a.at(pos);
+}
+
+
+template <>
+bool ConfigEntry::get<bool>(unsigned pos) {
+	std::vector<bool> a;
+	getBoolArray(a);
+	if (a.size() <= pos) {
+		throw NotFound("Entry with such index not found.");
+	}
+	return a.at(pos);
+}
+
+}
+
+
 ConfigEntry::ConfigEntry()
 {
 	name = "";
@@ -201,9 +247,6 @@ void ConfigEntry::getStringArray(std::vector<std::string> &a)
 	}
 }
 
-
-
-
 int kutils::Config::getLineType(std::string line)
 {
 	//если нулевой длинны - пропускаем
@@ -333,5 +376,3 @@ void Config::parseString(std::string str) throw(ParseError)
 	std::istringstream iss(str);
 	parseStream(iss);
 }
-
-

@@ -216,10 +216,10 @@ int main(int argc, char** argv) {
 					ds(i2 + dac.partOrigin(X, i), j2 + dac.partOrigin(Y, j), k2 + dac.partOrigin(Z, k), 0) = d(i2, j2, k2, 0);
 				}
 			}
-			ds.inverseBytes();
 
 			if (cfg.format == 0) {
 				// save to VTK
+				ds.inverseBytes();
 				sprintf(name, "out-%06ld.vtk", (long)step);
 				vs.save(std::string(name));
 			}

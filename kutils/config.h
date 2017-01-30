@@ -58,6 +58,12 @@ namespace kutils {
 			
 			template <typename T>
 			T get() { return kutils::toT<T>(getValue()); }
+			
+			
+			template <typename T>
+			T get(unsigned pos);
+			
+			
 			template <typename T>
 			T get(const char *path) { return getEntry(path).get<T>(); }
 			
@@ -68,7 +74,6 @@ namespace kutils {
 				}
 				return def;
 			}
-			
 			
 			void getDoubleArray(std::vector<double> &a);
 			void getIntArray(std::vector<int> &a);
@@ -90,7 +95,6 @@ namespace kutils {
 			
 			static std::string DELIMETER;
 	};
-
 	
 	class Config {
 		public:
@@ -104,6 +108,8 @@ namespace kutils {
 			std::string getValue(std::string path) throw(ConfigEntry::InvalidEntry, NotFound) { return entries.getEntry(path).getValue(); }
 			template <typename T>
 			T get(const std::string &path) { return entries.getEntry(path).get<T>(); }
+			template <typename T>
+			T get(const std::string &path, unsigned pos) { return entries.getEntry(path).get<T>(pos); };
 			bool hasKey(const std::string &key) { return entries.hasKey(key); }
 		private:
 			int getLineType(std::string line);

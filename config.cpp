@@ -39,27 +39,20 @@ void Config::readConfig(string file) {
 	ho = order / 2;
 	fdc.calc(ho);
 
-	std::vector<int> a;
-	kconf.getEntry("nodes").getIntArray(a);
-	nx = a.at(0);
-	ny = a.at(1);
+	nx = kconf.get<int>("nodes", 0);
+	ny = kconf.get<int>("nodes", 1);
 	if (dims == 2) nz = 1;
-	else if (dims == 3) nz = a.at(2);
+	else if (dims == 3) nz = kconf.get<int>("nodes", 2);
 
-	std::vector<double> b;
-	b.clear();
-	kconf.getEntry("origin").getDoubleArray(b);
-	ox = b.at(0);
-	oy = b.at(1);
+	ox = kconf.get<double>("origin", 0);
+	oy = kconf.get<double>("origin", 1);
 	if (dims == 2) oz = -1;
-	else if (dims == 3) oz = b.at(2);
+	else if (dims == 3) oz = kconf.get<double>("origin", 2);
 
-	b.clear();
-	kconf.getEntry("space_step").getDoubleArray(b);
-	dx = b.at(0);
-	dy = b.at(1);
+	dx = kconf.get<double>("space_step", 0);
+	dy = kconf.get<double>("space_step", 1);
 	if (dims == 2) dz = 1;
-	else if (dims == 3) dz = b.at(2);
+	else if (dims == 3) dz = kconf.get<double>("space_step", 2);;
 
 	steps = kconf.get<int_t>("time_steps");
 	dt = kconf.get<real_t>("time_step");
@@ -77,45 +70,34 @@ void Config::readConfig(string file) {
 	max_pml = kconf.get<real_t>("pml_max");
 	pml_len = kconf.get<real_t>("pml_nodes");
 
-	std::vector<std::string> s;
-	s.clear();
-	kconf.getEntry("left_boundaries").getStringArray(s);
-	isPml[0][0] = (s.at(0) == "absorb");
-	isPml[1][0] = (s.at(1) == "absorb");
-	if (dims == 3) isPml[2][0] = (s.at(2) == "absorb");
+	isPml[0][0] = (kconf.get<std::string>("left_boundaries", 0) == "absorb");
+	isPml[1][0] = (kconf.get<std::string>("left_boundaries", 1) == "absorb");
+	if (dims == 3) isPml[2][0] = (kconf.get<std::string>("left_boundaries", 2) == "absorb");
 	else isPml[2][0] = false;
 
-	s.clear();
-	kconf.getEntry("right_boundaries").getStringArray(s);
-	isPml[0][1] = (s.at(0) == "absorb");
-	isPml[1][1] = (s.at(1) == "absorb");
-	if (dims == 3) isPml[2][1] = (s.at(2) == "absorb");
+	isPml[0][1] = (kconf.get<std::string>("right_boundaries", 0) == "absorb");
+	isPml[1][1] = (kconf.get<std::string>("right_boundaries", 1) == "absorb");
+	if (dims == 3) isPml[2][1] = (kconf.get<std::string>("right_boundaries", 2) == "absorb");
 	else isPml[2][1] = false;
 
-	a.clear();
-	kconf.getEntry("global_parts").getIntArray(a);
-	gx = a.at(0);
-	gy = a.at(1);
+	gx = kconf.get<int>("global_parts", 0);
+	gy = kconf.get<int>("global_parts", 1);
 	if (dims == 2) gz = 1;
-	else if (dims == 3) gz = a.at(2);
+	else if (dims == 3) gz = kconf.get<int>("global_parts", 2);
 
-	a.clear();
-	kconf.getEntry("local_parts").getIntArray(a);
-	lx = a.at(0);
-	ly = a.at(1);
+	lx = kconf.get<int>("local_parts", 0);
+	ly = kconf.get<int>("local_parts", 1);
 	if (dims == 2) lz = 1;
-	else if (dims == 3) lz = a.at(2);
+	else if (dims == 3) lz = kconf.get<int>("local_parts", 2);
 
 	string sourcesFile = kconf.get<std::string>("sources_position");
 	string receiversFile = kconf.get<std::string>("receivers_position");
 	string KFile = kconf.get<std::string>("bulk_modulus");
 
-	s.clear();
-	kconf.getEntry("density").getStringArray(s);
-	string rhoXFile = s.at(0);
-	string rhoYFile = s.at(1);
+	string rhoXFile = kconf.get<std::string>("density", 0);
+	string rhoYFile = kconf.get<std::string>("density", 1);
 	string rhoZFile;
-	if (dims == 3) rhoZFile = s.at(2);
+	if (dims == 3) rhoZFile = kconf.get<std::string>("density", 2);
 
 	rcvsOut = kconf.get<std::string>("receivers_output");
 #ifndef USE_MPI
