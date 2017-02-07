@@ -6,12 +6,13 @@
 #include <map>
 
 #include "kutils/config.h"
-#include "fdcoeff.h"
+#include "rgrid/fdcoeff.h"
 #include "common.h"
 #include "rgrid/darrayscatter.h"
 
 class Config {
 public:
+	Config() : fdc(2) {}
 	void readConfig(std::string file);
 	void readRhoX(std::string file);
 	void readRhoY(std::string file);
@@ -48,7 +49,7 @@ public:
 	rgrid::DArrayScatter<real_t, int_t> rhox, rhoy, rhoz; // density
 
 	int_t ho; // half order
-	FDCoeff fdc;
+	rgrid::FDCoeff fdc;
 
 	kutils::Config kconf;
 

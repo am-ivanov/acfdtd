@@ -37,7 +37,6 @@ void Config::readConfig(string file) {
 	int_t order = kconf.get<int_t>("order");
 	if (!(order > 0 && order % 2 == 0)) throw logic_error("Wrong order");
 	ho = order / 2;
-	fdc.calc(ho);
 
 	nx = kconf.get<int>("nodes", 0);
 	ny = kconf.get<int>("nodes", 1);
