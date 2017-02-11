@@ -37,32 +37,6 @@ struct PMLParams {
 	real_t b;
 };
 
-typedef GridOperator<real_t, int_t, FuncId, FD1X> F1X;
-typedef GridOperator<real_t, int_t, FuncId, FD1Y> F1Y;
-typedef GridOperator<real_t, int_t, FuncId, FD1Z> F1Z;
-
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_LEFT, X, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1X_L;
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_LEFT, Y, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1Y_L;
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_LEFT, Z, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1Z_L;
-
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_RIGHT, X, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1X_R;
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_RIGHT, Y, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1Y_R;
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_RIGHT, Z, PML_DERIV, OFFSET_PLUS_HALF, FD1> F1Z_R;
-
-typedef GridOperator<real_t, int_t, FuncId, BD1X> B1X;
-typedef GridOperator<real_t, int_t, FuncAdd, BD1Y> B1Y;
-typedef GridOperator<real_t, int_t, FuncAdd, BD1Z> B1Z;
-
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_LEFT, X, PML_DERIV, OFFSET_NONE, BD1> B1X_L;
-typedef GridPMLOperator<real_t, int_t, FuncAdd, SIDE_LEFT, Y, PML_DERIV, OFFSET_NONE, BD1> B1Y_L;
-typedef GridPMLOperator<real_t, int_t, FuncAdd, SIDE_LEFT, Z, PML_DERIV, OFFSET_NONE, BD1> B1Z_L;
-
-typedef GridPMLOperator<real_t, int_t, FuncId, SIDE_RIGHT, X, PML_DERIV, OFFSET_NONE, BD1> B1X_R;
-typedef GridPMLOperator<real_t, int_t, FuncAdd, SIDE_RIGHT, Y, PML_DERIV, OFFSET_NONE, BD1> B1Y_R;
-typedef GridPMLOperator<real_t, int_t, FuncAdd, SIDE_RIGHT, Z, PML_DERIV, OFFSET_NONE, BD1> B1Z_R;
-
-typedef GridOperator<real_t, int_t, FuncDiv, ID> DIV;
-
 int main(int argc, char** argv) {
 	feenableexcept(FE_INVALID | FE_OVERFLOW);  // Enable all floating point exceptions but FE_INEXACT
 	rgmpi::init(&argc, &argv);
@@ -300,6 +274,10 @@ int main(int argc, char** argv) {
 			}
 		}
 
+		Range<int_t> r_a2(
+			cfg.pml_len, cfg.pml_len, 0, 
+			cfg.nx-cfg.pml_len, cfg.ny-cfg.pml_len, cfg.nz);
+		
 		Range<int_t> r_a(0, 0, 0, cfg.nx, cfg.ny, cfg.nz);
 		
 		Range<int_t> r_x(cfg.pml_len, 0, 0, cfg.nx-cfg.pml_len, cfg.ny, cfg.nz);
@@ -314,32 +292,54 @@ int main(int argc, char** argv) {
 		Range<int_t> r_z_l(0, 0, 0, cfg.nx, cfg.ny, cfg.pml_len);
 		Range<int_t> r_z_r(0, 0, cfg.nz-cfg.pml_len, cfg.nx, cfg.ny, cfg.nz);
 		
-		TaskParams<real_t, int_t> tp;
-		tp.half_order = cfg.ho;
-		tp.pml_d_max = Dim3D<int_t>(cfg.max_pml, cfg.max_pml, cfg.max_pml);
-		tp.space_step = Dim3D<int_t>(cfg.dx, cfg.dy, cfg.dz);
-		tp.time_step = cfg.dt;
+		typedef VarOp<real_t, int_t> TU;
+		TU uop1, uop2;
 		
-		F1X::apply(tp, r_x, *u, x1das);
-		F1Y::apply(tp, r_y, *u, y1das);
-		if (cfg.dims == 3)
-			F1Z::apply(tp, r_z, *u, z1das);
+		typedef FD1Op<X, TU> TUX;
+		TUX uxop(cfg.dx, cfg.ho, uop1);
+		typedef GridOp<TUX> GTUX;
+		GTUX gxop;
 		
-		F1X_L f1x_l(tp, r_x_l, *u, x1das);
-		F1Y_L f1y_l(tp, r_y_l, *u, y1das);
-		F1Z_L f1z_l(tp, r_z_l, *u, z1das);
-		F1X_R f1x_r(tp, r_x_r, *u, x1das);
-		F1Y_R f1y_r(tp, r_y_r, *u, y1das);
-		F1Z_R f1z_r(tp, r_z_r, *u, z1das);
+		gxop.setInput(uop1, *u);
+		gxop.apply(r_a2, uxop, x1das);
+		
+		typedef FD1Op<Y, TU> TUY;
+		TUY uyop(cfg.dy, cfg.ho, uop2);
+		typedef GridOp<TUY> GTUY;
+		GTUY gyop;
+		
+		gyop.setInput(uop2, *u);
+		gyop.apply(r_a2, uyop, y1das);
+		
+// 		typedef FD1Op<real_t, int_t, Z, TU> TUZ;
+// 		TUZ uzop(cfg.dz, cfg.ho, uop);
+// 		typedef GridOp<real_t, int_t, RepId, TUZ> GTUZ;
+// 		GTUZ gzop;
+		
 
-		f1x_l.apply();
-		f1x_r.apply();
-		f1y_l.apply();
-		f1y_r.apply();
-		if (cfg.dims == 3) {
-			f1z_l.apply();
-			f1z_r.apply();
-		}
+		
+		
+		
+// 		if (cfg.dims == 3) {
+// 			gzop.setInput(uop, *u);
+// 			gzop.apply(r_x, uzop, z1das);
+// 		}
+		
+// 		F1X_L f1x_l(tp, r_x_l, *u, x1das);
+// 		F1Y_L f1y_l(tp, r_y_l, *u, y1das);
+// 		F1Z_L f1z_l(tp, r_z_l, *u, z1das);
+// 		F1X_R f1x_r(tp, r_x_r, *u, x1das);
+// 		F1Y_R f1y_r(tp, r_y_r, *u, y1das);
+// 		F1Z_R f1z_r(tp, r_z_r, *u, z1das);
+// 
+// 		f1x_l.apply();
+// 		f1x_r.apply();
+// 		f1y_l.apply();
+// 		f1y_r.apply();
+// 		if (cfg.dims == 3) {
+// 			f1z_l.apply();
+// 			f1z_r.apply();
+// 		}
 		
 // 		// recalculate own DArrays
 // 		for (int_t gk = 0; gk != dac.numParts(Z); ++gk)
@@ -422,11 +422,12 @@ int main(int argc, char** argv) {
 // 							}
 // 						}
 // 				}
-				
-		DIV::apply(tp, r_a, cfg.rhox, x1das);
-		DIV::apply(tp, r_a, cfg.rhoy, y1das);
-		if (cfg.dims == 3)
-			DIV::apply(tp, r_a, cfg.rhoz, z1das);
+
+// 		// TODO
+// 		DIV::apply(tp, r_a, cfg.rhox, x1das);
+// 		DIV::apply(tp, r_a, cfg.rhoy, y1das);
+// 		if (cfg.dims == 3)
+// 			DIV::apply(tp, r_a, cfg.rhoz, z1das);
 
 		x1das.externalSyncStart();
 		y1das.externalSyncStart();
@@ -440,28 +441,79 @@ int main(int argc, char** argv) {
 		y1das.externalSyncEnd();
 		z1das.externalSyncEnd();
 		
-		B1X_L b1x_l(tp, r_x_l, x1das, *un);
-		B1Y_L b1y_l(tp, r_y_l, y1das, *un);
-		B1Z_L b1z_l(tp, r_z_l, z1das, *un);
-		B1X_R b1x_r(tp, r_x_r, x1das, *un);
-		B1Y_R b1y_r(tp, r_y_r, y1das, *un);
-		B1Z_R b1z_r(tp, r_z_r, z1das, *un);
+// 		B1X_L b1x_l(tp, r_x_l, x1das, *un);
+// 		B1Y_L b1y_l(tp, r_y_l, y1das, *un);
+// 		B1Z_L b1z_l(tp, r_z_l, z1das, *un);
+// 		B1X_R b1x_r(tp, r_x_r, x1das, *un);
+// 		B1Y_R b1y_r(tp, r_y_r, y1das, *un);
+// 		B1Z_R b1z_r(tp, r_z_r, z1das, *un);
 		
-		B1X::apply(tp, r_x, x1das, *un);
-		b1x_l.apply();
-		b1x_r.apply();
+// 		B1X::apply(tp, r_x, x1das, *un);
+// 		b1x_l.apply();
+// 		b1x_r.apply();
+// 		
+// 		B1Y::apply(tp, r_y, y1das, *un);
+// 		b1y_l.apply();
+// 		b1y_r.apply();
+// 		
+// 		if (cfg.dims == 3) {
+// 			B1Z::apply(tp, r_z, z1das, *un);
+// 			b1z_l.apply();
+// 			b1z_r.apply();
+// 		}
 		
-		B1Y::apply(tp, r_y, y1das, *un);
-		b1y_l.apply();
-		b1y_r.apply();
+		typedef VarOp<real_t, int_t> TUX2, TUY2;
+		TUX2 ux2op;
+		TUY2 uy2op;
+		//TUZ2 uz2op;
 		
-		if (cfg.dims == 3) {
-			B1Z::apply(tp, r_z, z1das, *un);
-			b1z_l.apply();
-			b1z_r.apply();
-		}
+		typedef BD1Op<X, TUX2> TUXX;
+		TUXX uxxop(cfg.dx, cfg.ho, ux2op);
+		typedef BD1Op<Y, TUY2> TUYY;
+		TUYY uyyop(cfg.dy, cfg.ho, uy2op);
+		
+		//typedef FD1Op<real_t, int_t, Z, TUZ2> TUZZ;
+		//TUZ uzzop(cfg.dz, cfg.ho, uz2op);
+		
+		typedef BinaryOp<TUXX, TUYY, AddOp<real_t> > TUSUM2;
+		TUSUM2 ts2(uxxop, uyyop);
+		//typedef BinaryOp<real_t, TUSUM2, TUZZ, AddOp<real_t> > TUSUM3;
+		typedef VarOp<real_t, int_t> TK;
+		TK tk;
+		typedef ConstOp<real_t, int_t> TDT2;
+		TDT2 tdt(cfg.dt*cfg.dt);
+		typedef BinaryOp<TK, TDT2, MulOp<real_t> > TUMUL2;
+		TUMUL2 tm2(tk, tdt);
+		typedef BinaryOp<TUMUL2, TUSUM2, MulOp<real_t> > TUMUL3;
+		TUMUL3 tm3(tm2, ts2);
+		
+		typedef ConstOp<real_t, int_t> TC2;
+		TC2 tc2(2.0);
+		typedef VarOp<real_t, int_t> TUA;
+		TUA tua;
+		typedef VarOp<real_t, int_t> TNUA;
+		TNUA tnua;
+		typedef BinaryOp<TC2, TUA, MulOp<real_t> > TUAC2;
+		TUAC2 tuac2(tc2, tua);
+		typedef BinaryOp<TUAC2, TNUA, SubOp<real_t> > TSUB;
+		TSUB tsub(tuac2, tnua);
+		typedef BinaryOp<TSUB, TUMUL3, AddOp<real_t> > TRES;
+		TRES tres(tsub, tm3);
+		
+		typedef GridOp<TRES> GTRES;
+		GTRES gtres;
+		gtres.setInput(ux2op, x1das);
+		gtres.setInput(uy2op, y1das);
+		gtres.setInput(tk, cfg.K);
+		gtres.setInput(tua, *u);
+		gtres.setInput(tnua, *un);
+		gtres.apply(r_a2, tres, *un);
 		
 		
+// 		typedef GridOp<real_t, int_t, RepId, TUX2> GTRES;
+// 		GTRES gtres;
+// 		gtres.setInput(ux2op, x1das);
+// 		gtres.apply(r_a2, ux2op, *un);
 
 // 		for (int_t gk = 0; gk != dac.numParts(Z); ++gk)
 // 			for (int_t gj = 0; gj != dac.numParts(Y); ++gj)
