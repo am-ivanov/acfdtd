@@ -198,8 +198,40 @@ int main(int argc, char** argv) {
 	}
 #endif
 
+	Range<int_t> r_a2(
+	cfg.pml_len, cfg.pml_len, 0, 
+	cfg.nx-cfg.pml_len, cfg.ny-cfg.pml_len, cfg.nz);
+	
+	Range<int_t> r_a(0, 0, 0, cfg.nx, cfg.ny, cfg.nz);
+	
+	Range<int_t> r_x(cfg.pml_len, 0, 0, cfg.nx-cfg.pml_len, cfg.ny, cfg.nz);
+	Range<int_t> r_x_l(0, 0, 0, cfg.pml_len, cfg.ny, cfg.nz);
+	Range<int_t> r_x_r(cfg.nx-cfg.pml_len, 0, 0, cfg.nx, cfg.ny, cfg.nz);
+	
+	Range<int_t> r_y(0, cfg.pml_len, 0, cfg.nx, cfg.ny-cfg.pml_len, cfg.nz);
+	Range<int_t> r_y_l(0, 0, 0, cfg.nx, cfg.pml_len, cfg.nz);
+	Range<int_t> r_y_r(0, cfg.ny-cfg.pml_len, 0, cfg.nx, cfg.ny, cfg.nz);
+	
+	Range<int_t> r_z(0, 0, cfg.pml_len, cfg.nx, cfg.ny, cfg.nz-cfg.pml_len);
+	Range<int_t> r_z_l(0, 0, 0, cfg.nx, cfg.ny, cfg.pml_len);
+	Range<int_t> r_z_r(0, 0, cfg.nz-cfg.pml_len, cfg.nx, cfg.ny, cfg.nz);
+
+	// operator expressions
+	GridOp<real_t, int_t> gop;
+	GridOp<real_t, int_t>::VarType var_ux = gop.setVar("ux", x1das);
+	GridOp<real_t, int_t>::VarType var_uy = gop.setVar("uy", y1das);
+	GridOp<real_t, int_t>::VarType var_k = gop.setVar("k", cfg.K);
+	GridOp<real_t, int_t>::VarType var_rhox = gop.setVar("rhox", cfg.rhox);
+	GridOp<real_t, int_t>::VarType var_rhoy = gop.setVar("rhoy", cfg.rhoy);
+	GridOp<real_t, int_t>::VarType var_rhoz = gop.setVar("rhoz", cfg.rhoz);
+	GridOp<real_t, int_t>::ConstType con_t2(cfg.dt*cfg.dt);
+	GridOp<real_t, int_t>::ConstType con_2(2);
+
 	real_t t = 0.0;
 	for (int_t step = 0; step != cfg.steps; ++step) {
+		// rename DArrays because of swapping variables
+		GridOp<real_t, int_t>::VarType var_u = gop.setVar("u", *u);
+		GridOp<real_t, int_t>::VarType var_un = gop.setVar("un", *un);
 
 		DArrayContainer<real_t, int_t>& dac = u->getLocalContainer();
 		//DArrayContainer<real_t, int_t>& dacNext = un->getLocalContainer();
@@ -273,161 +305,9 @@ int main(int argc, char** argv) {
 #endif
 			}
 		}
-
-		Range<int_t> r_a2(
-			cfg.pml_len, cfg.pml_len, 0, 
-			cfg.nx-cfg.pml_len, cfg.ny-cfg.pml_len, cfg.nz);
 		
-		Range<int_t> r_a(0, 0, 0, cfg.nx, cfg.ny, cfg.nz);
-		
-		Range<int_t> r_x(cfg.pml_len, 0, 0, cfg.nx-cfg.pml_len, cfg.ny, cfg.nz);
-		Range<int_t> r_x_l(0, 0, 0, cfg.pml_len, cfg.ny, cfg.nz);
-		Range<int_t> r_x_r(cfg.nx-cfg.pml_len, 0, 0, cfg.nx, cfg.ny, cfg.nz);
-		
-		Range<int_t> r_y(0, cfg.pml_len, 0, cfg.nx, cfg.ny-cfg.pml_len, cfg.nz);
-		Range<int_t> r_y_l(0, 0, 0, cfg.nx, cfg.pml_len, cfg.nz);
-		Range<int_t> r_y_r(0, cfg.ny-cfg.pml_len, 0, cfg.nx, cfg.ny, cfg.nz);
-		
-		Range<int_t> r_z(0, 0, cfg.pml_len, cfg.nx, cfg.ny, cfg.nz-cfg.pml_len);
-		Range<int_t> r_z_l(0, 0, 0, cfg.nx, cfg.ny, cfg.pml_len);
-		Range<int_t> r_z_r(0, 0, cfg.nz-cfg.pml_len, cfg.nx, cfg.ny, cfg.nz);
-		
-		typedef VarOp<real_t, int_t> TU;
-		TU uop1, uop2;
-		
-		typedef FD1Op<X, TU> TUX;
-		TUX uxop(cfg.dx, cfg.ho, uop1);
-		typedef GridOp<TUX> GTUX;
-		GTUX gxop;
-		
-		gxop.setInput(uop1, *u);
-		gxop.apply(r_a2, uxop, x1das);
-		
-		typedef FD1Op<Y, TU> TUY;
-		TUY uyop(cfg.dy, cfg.ho, uop2);
-		typedef GridOp<TUY> GTUY;
-		GTUY gyop;
-		
-		gyop.setInput(uop2, *u);
-		gyop.apply(r_a2, uyop, y1das);
-		
-// 		typedef FD1Op<real_t, int_t, Z, TU> TUZ;
-// 		TUZ uzop(cfg.dz, cfg.ho, uop);
-// 		typedef GridOp<real_t, int_t, RepId, TUZ> GTUZ;
-// 		GTUZ gzop;
-		
-
-		
-		
-		
-// 		if (cfg.dims == 3) {
-// 			gzop.setInput(uop, *u);
-// 			gzop.apply(r_x, uzop, z1das);
-// 		}
-		
-// 		F1X_L f1x_l(tp, r_x_l, *u, x1das);
-// 		F1Y_L f1y_l(tp, r_y_l, *u, y1das);
-// 		F1Z_L f1z_l(tp, r_z_l, *u, z1das);
-// 		F1X_R f1x_r(tp, r_x_r, *u, x1das);
-// 		F1Y_R f1y_r(tp, r_y_r, *u, y1das);
-// 		F1Z_R f1z_r(tp, r_z_r, *u, z1das);
-// 
-// 		f1x_l.apply();
-// 		f1x_r.apply();
-// 		f1y_l.apply();
-// 		f1y_r.apply();
-// 		if (cfg.dims == 3) {
-// 			f1z_l.apply();
-// 			f1z_r.apply();
-// 		}
-		
-// 		// recalculate own DArrays
-// 		for (int_t gk = 0; gk != dac.numParts(Z); ++gk)
-// 			for (int_t gj = 0; gj != dac.numParts(Y); ++gj)
-// 				for (int_t gi = 0; gi != dac.numParts(X); ++gi) {
-// 					//DArray<real_t, int_t>& p = dac.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& x1 = x1das.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& y1 = y1das.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& z1 = z1das.getDArrayPart(gi, gj, gk);
-// 
-// 					DArray<real_t, int_t>& rhox = cfg.rhox.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& rhoy = cfg.rhoy.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& rhoz = cfg.rhoz.getDArrayPart(gi, gj, gk);
-// 
-// 					// inner area
-// 					for (int_t k = 0; k != rhox.localSize(Z); ++k) {
-// 						for (int_t j = 0; j != rhox.localSize(Y); ++j) {
-// 							for (int_t i = 0; i != rhox.localSize(X); ++i) {
-// 								int_t i2 = i + rhox.origin(X);
-// 								int_t j2 = j + rhox.origin(Y);
-// 								int_t k2 = k + rhox.origin(Z);
-// // 								x1(i, j, k, 0) = 0;
-// // 								for (int_t n = 0; n < cfg.ho; ++n)
-// // 									x1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i+1+n, j, k, 0) - p(i-n, j, k, 0));
-// // 								x1(i, j, k, 0) /= cfg.dx;
-// 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
-// 									pml[0][0](i2,j2,k2,PHI1X) = pmlParams1.at(i2).b * pml[0][0](i2,j2,k2,PHI1X) + pmlParams1.at(i).a * x1(i,j,k,0);
-// 									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][0](i2,j2,k2,PHI1X);
-// 								} else if (i2 > cfg.nx-cfg.pml_len-2 && cfg.isPml[0][1]) {
-// 									pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) = pmlParams1.at(cfg.nx-i2-2).b * pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X) + pmlParams1.at(cfg.nx-i2-2).a * x1(i,j,k,0);
-// 									x1(i,j,k,0) = x1(i,j,k,0) + pml[0][1](cfg.nx-i2-2,j2,k2,PHI1X);
-// 								}
-// // 								x1(i, j, k, 0) /= rhox(i, j, k, 0);
-// 							}
-// 						}
-// 					}
-// 
-// 					for (int_t k = 0; k != rhoy.localSize(Z); ++k) {
-// 						for (int_t j = 0; j != rhoy.localSize(Y); ++j) {
-// 							for (int_t i = 0; i != rhoy.localSize(X); ++i) {
-// 								int_t i2 = i + rhoy.origin(X);
-// 								int_t j2 = j + rhoy.origin(Y);
-// 								int_t k2 = k + rhoy.origin(Z);
-// // 								y1(i, j, k, 0) = 0;
-// // 								for (int_t n = 0; n < cfg.ho; ++n)
-// // 									y1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i,j+1+n,k,0) - p(i,j-n,k,0));
-// // 								y1(i, j, k, 0) /= cfg.dy;
-// 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
-// 									pml[1][0](i2,j2,k2,PHI1Y) = pmlParams1.at(j2).b * pml[1][0](i2,j2,k2,PHI1Y) + pmlParams1.at(j2).a * y1(i,j,k,0);
-// 									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][0](i2,j2,k2,PHI1Y);
-// 								} else if (j2 > cfg.ny-cfg.pml_len-2 && cfg.isPml[1][1]) {
-// 									pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) = pmlParams1.at(cfg.ny-j2-2).b * pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y) + pmlParams1.at(cfg.ny-j2-2).a * y1(i,j,k,0);
-// 									y1(i,j,k,0) = y1(i,j,k,0) + pml[1][1](i2,cfg.ny-j2-2,k2,PHI1Y);
-// 								}
-// //								y1(i, j, k, 0) /= rhoy(i, j, k, 0);
-// 							}
-// 						}
-// 					}
-// 
-// 					if (cfg.dims == 3)
-// 						for (int_t k = 0; k != rhoz.localSize(Z); ++k) {
-// 							for (int_t j = 0; j != rhoz.localSize(Y); ++j) {
-// 								for (int_t i = 0; i != rhoz.localSize(X); ++i) {
-// 									int_t i2 = i + rhoz.origin(X);
-// 									int_t j2 = j + rhoz.origin(Y);
-// 									int_t k2 = k + rhoz.origin(Z);
-// // 									z1(i, j, k, 0) = 0;
-// // 									for (int_t n = 0; n < cfg.ho; ++n)
-// // 										z1(i, j, k, 0) += cfg.fdc.sc1(n+1) * (p(i,j,k+1+n,0) - p(i,j,k-n,0));
-// // 									z1(i, j, k, 0) /= cfg.dz;
-// 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
-// 										pml[2][0](i2,j2,k2,PHI1Z) = pmlParams1.at(k2).b * pml[2][0](i2,j2,k2,PHI1Z) + pmlParams1.at(k2).a * z1(i,j,k,0);
-// 										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][0](i2,j2,k2,PHI1Z);
-// 									} else if (k2 > cfg.nz-cfg.pml_len-2 && cfg.isPml[2][1]) {
-// 										pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) = pmlParams1.at(cfg.nz-k2-2).b * pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z) + pmlParams1.at(cfg.nz-k2-2).a * z1(i,j,k,0);
-// 										z1(i,j,k,0) = z1(i,j,k,0) + pml[2][1](i2,j2,cfg.nz-k2-2,PHI1Z);
-// 									}
-// // 									z1(i, j, k, 0) /= rhoz(i, j, k, 0);
-// 								}
-// 							}
-// 						}
-// 				}
-
-// 		// TODO
-// 		DIV::apply(tp, r_a, cfg.rhox, x1das);
-// 		DIV::apply(tp, r_a, cfg.rhoy, y1das);
-// 		if (cfg.dims == 3)
-// 			DIV::apply(tp, r_a, cfg.rhoz, z1das);
+		gop.apply(r_a2, fd1<X>(cfg.dx, cfg.ho, var_u) / var_rhox, x1das);
+		gop.apply(r_a2, fd1<Y>(cfg.dy, cfg.ho, var_u) / var_rhoy, y1das);
 
 		x1das.externalSyncStart();
 		y1das.externalSyncStart();
@@ -441,143 +321,10 @@ int main(int argc, char** argv) {
 		y1das.externalSyncEnd();
 		z1das.externalSyncEnd();
 		
-// 		B1X_L b1x_l(tp, r_x_l, x1das, *un);
-// 		B1Y_L b1y_l(tp, r_y_l, y1das, *un);
-// 		B1Z_L b1z_l(tp, r_z_l, z1das, *un);
-// 		B1X_R b1x_r(tp, r_x_r, x1das, *un);
-// 		B1Y_R b1y_r(tp, r_y_r, y1das, *un);
-// 		B1Z_R b1z_r(tp, r_z_r, z1das, *un);
-		
-// 		B1X::apply(tp, r_x, x1das, *un);
-// 		b1x_l.apply();
-// 		b1x_r.apply();
-// 		
-// 		B1Y::apply(tp, r_y, y1das, *un);
-// 		b1y_l.apply();
-// 		b1y_r.apply();
-// 		
-// 		if (cfg.dims == 3) {
-// 			B1Z::apply(tp, r_z, z1das, *un);
-// 			b1z_l.apply();
-// 			b1z_r.apply();
-// 		}
-		
-		typedef VarOp<real_t, int_t> TUX2, TUY2;
-		TUX2 ux2op;
-		TUY2 uy2op;
-		//TUZ2 uz2op;
-		
-		typedef BD1Op<X, TUX2> TUXX;
-		TUXX uxxop(cfg.dx, cfg.ho, ux2op);
-		typedef BD1Op<Y, TUY2> TUYY;
-		TUYY uyyop(cfg.dy, cfg.ho, uy2op);
-		
-		//typedef FD1Op<real_t, int_t, Z, TUZ2> TUZZ;
-		//TUZ uzzop(cfg.dz, cfg.ho, uz2op);
-		
-		typedef BinaryOp<TUXX, TUYY, AddOp<real_t> > TUSUM2;
-		TUSUM2 ts2(uxxop, uyyop);
-		//typedef BinaryOp<real_t, TUSUM2, TUZZ, AddOp<real_t> > TUSUM3;
-		typedef VarOp<real_t, int_t> TK;
-		TK tk;
-		typedef ConstOp<real_t, int_t> TDT2;
-		TDT2 tdt(cfg.dt*cfg.dt);
-		typedef BinaryOp<TK, TDT2, MulOp<real_t> > TUMUL2;
-		TUMUL2 tm2(tk, tdt);
-		typedef BinaryOp<TUMUL2, TUSUM2, MulOp<real_t> > TUMUL3;
-		TUMUL3 tm3(tm2, ts2);
-		
-		typedef ConstOp<real_t, int_t> TC2;
-		TC2 tc2(2.0);
-		typedef VarOp<real_t, int_t> TUA;
-		TUA tua;
-		typedef VarOp<real_t, int_t> TNUA;
-		TNUA tnua;
-		typedef BinaryOp<TC2, TUA, MulOp<real_t> > TUAC2;
-		TUAC2 tuac2(tc2, tua);
-		typedef BinaryOp<TUAC2, TNUA, SubOp<real_t> > TSUB;
-		TSUB tsub(tuac2, tnua);
-		typedef BinaryOp<TSUB, TUMUL3, AddOp<real_t> > TRES;
-		TRES tres(tsub, tm3);
-		
-		typedef GridOp<TRES> GTRES;
-		GTRES gtres;
-		gtres.setInput(ux2op, x1das);
-		gtres.setInput(uy2op, y1das);
-		gtres.setInput(tk, cfg.K);
-		gtres.setInput(tua, *u);
-		gtres.setInput(tnua, *un);
-		gtres.apply(r_a2, tres, *un);
-		
-		
-// 		typedef GridOp<real_t, int_t, RepId, TUX2> GTRES;
-// 		GTRES gtres;
-// 		gtres.setInput(ux2op, x1das);
-// 		gtres.apply(r_a2, ux2op, *un);
-
-// 		for (int_t gk = 0; gk != dac.numParts(Z); ++gk)
-// 			for (int_t gj = 0; gj != dac.numParts(Y); ++gj)
-// 				for (int_t gi = 0; gi != dac.numParts(X); ++gi) {
-// 
-// 					DArray<real_t, int_t>& p = dac.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& pn = dacNext.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& K = cfg.K.getDArrayPart(gi, gj, gk);
-// 
-// 					DArray<real_t, int_t>& x1 = x1das.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& y1 = y1das.getDArrayPart(gi, gj, gk);
-// 					DArray<real_t, int_t>& z1 = z1das.getDArrayPart(gi, gj, gk);
-// 
-// 					for (int_t k = 0; k != p.localSize(Z); ++k) {
-// 						for (int_t j = 0; j != p.localSize(Y); ++j) {
-// 							for (int_t i = 0; i != p.localSize(X); ++i) {
-// 								real_t x2 = 0, y2 = 0, z2 = 0;
-// 								int_t i2 = i + p.origin(X);
-// 								int_t j2 = j + p.origin(Y);
-// 								int_t k2 = k + p.origin(Z);
-// 
-// 								for (int_t n = 0; n < cfg.ho; ++n)
-// 									x2 += cfg.fdc.sc1(n+1) * (x1(i+n,j,k,0) - x1(i-1-n,j,k,0));
-// 								x2 /= cfg.dx;
-// 								if (i2 < cfg.pml_len && cfg.isPml[0][0]) {
-// 									pml[0][0](i2,j2,k2,PHI2X) = pmlParams2.at(i2).b * pml[0][0](i2,j2,k2,PHI2X) + pmlParams2.at(i2).a * x2;
-// 									x2 = x2 + pml[0][0](i2,j2,k2,PHI2X);
-// 								} else if (i2 > cfg.nx - cfg.pml_len - 1 && cfg.isPml[0][1]) {
-// 									pml[0][1](cfg.nx-i2-1,j2,k2,PHI2X) = pmlParams2.at(cfg.nx-i2-1).b * pml[0][1](cfg.nx-i2-1,j2,k2,PHI2X) + pmlParams2.at(cfg.nx-i2-1).a * x2;
-// 									x2 = x2 + pml[0][1](cfg.nx-i2-1,j2,k2,PHI2X);
-// 								}
-// 
-// 								for (int_t n = 0; n < cfg.ho; ++n)
-// 									y2 += cfg.fdc.sc1(n+1) * (y1(i,j+n,k,0) - y1(i,j-1-n,k,0));
-// 								y2 /= cfg.dy;
-// 								if (j2 < cfg.pml_len && cfg.isPml[1][0]) {
-// 									pml[1][0](i2,j2,k2,PHI2Y) = pmlParams2.at(j2).b * pml[1][0](i2,j2,k2,PHI2Y) + pmlParams2.at(j).a * y2;
-// 									y2 = y2 + pml[1][0](i2,j2,k2,PHI2Y);
-// 								} else if (j2 > cfg.ny - cfg.pml_len - 1 && cfg.isPml[1][1]) {
-// 									pml[1][1](i2,cfg.ny-j2-1,k2,PHI2Y) = pmlParams2.at(cfg.ny-j2-1).b * pml[1][1](i2,cfg.ny-j2-1,k2,PHI2Y) + pmlParams2.at(cfg.ny-j2-1).a * y2;
-// 									y2 = y2 + pml[1][1](i2,cfg.ny-j2-1,k2,PHI2Y);
-// 								}
-// 
-// 								if (cfg.dims == 3) {
-// 									for (int_t n = 0; n < cfg.ho; ++n)
-// 										z2 += cfg.fdc.sc1(n+1) * (z1(i,j,k+n,0) - z1(i,j,k-1-n,0));
-// 									z2 /=  cfg.dz;
-// 									if (k2 < cfg.pml_len && cfg.isPml[2][0]) {
-// 										pml[2][0](i2,j2,k2,PHI2Z) = pmlParams2.at(k2).b * pml[2][0](i2,j2,k2,PHI2Z) + pmlParams2.at(k2).a * z2;
-// 										z2 = z2 + pml[2][0](i2,j2,k2,PHI2Z);
-// 									} else if (k2 > cfg.nz - cfg.pml_len - 1 && cfg.isPml[2][1]) {
-// 										pml[2][1](i2,j2,cfg.nz-k2-1,PHI2Z) = pmlParams2.at(cfg.nz-k2-1).b * pml[2][1](i2,j2,cfg.nz-k2-1,PHI2Z) + pmlParams2.at(cfg.nz-k2-1).a * z2;
-// 										z2 = z2 + pml[2][1](i2,j2,cfg.nz-k2-1,PHI2Z);
-// 									}
-// 								}
-// 
-// 								pn(i, j, k, 0) =
-// 									2.0 * p.val(i, j, k, 0) - pn(i, j, k, 0)
-// 									+ K(i, j, k, 0) * sqr(cfg.dt) * (x2 + y2 + z2);
-// 							}
-// 						}
-// 					}
-// 
-// 				}
+		gop.apply(
+			r_a2,
+			con_2 * var_u - var_un + var_k * con_t2 * (bd1<X>(cfg.dx, cfg.ho, var_ux) + bd1<Y>(cfg.dy, cfg.ho, var_uy)),
+			*un);
 
 		// insert source
 		for (vector<Source>::iterator it = cfg.src.begin(); it != cfg.src.end(); ++it) {
